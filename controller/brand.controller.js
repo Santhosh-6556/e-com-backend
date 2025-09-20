@@ -1,0 +1,134 @@
+import Brand from "../models/brand.model.js";
+import { errorResponse, successResponse } from "../utils/response.js";
+
+// Utility: generate recordId
+const generateRecordId = () => Date.now().toString();
+
+// ✅ Add Brand
+export const addBrand = async (req, res) => {
+  try {
+    const { identifier, name, shortDescription, image,displayPriority} = req.body;
+
+    if (!identifier) {
+      return errorResponse(res, "Identifier is required", 400);
+    }
+
+    // Check duplicate identifier
+    const existing = await Brand.findOne({ identifier });
+    if (existing) {
+      return errorResponse(res, "Identifier already exists", 400);
+    }
+
+    const newBrand = await Brand.create({
+      recordId: generateRecordId(),
+      identifier,
+      name,
+      shortDescription,
+      image,
+      displayPriority: displayPriority || 0,
+      status: true,
+      creationTime: Date.now(),
+      lastModified: Date.now(),
+    });
+
+    return successResponse(res, "Brand created successfully", newBrand);
+  } catch (error) {
+    console.error("Add Brand Error:", error);
+    return errorResponse(res, "Failed to create Brand", 500);
+  }
+};
+
+export const editBrand = async (req, res) => {
+  try {
+    const {
+      recordId,
+      identifier,
+      name,
+      shortDescription,
+      image,
+      status,
+      displayPriority,
+    } = req.body;
+
+    if (!recordId) {
+      return errorResponse(res, "recordId is required to edit Brand", 400);
+    }
+
+    // Find the Brand by recordId
+    const brand = await Brand.findOne({ recordId });
+    if (!brand) {
+      return errorResponse(res, "Brand not found", 404);
+    }
+
+
+    // Update fields
+    brand.identifier = identifier ?? brand.identifier;
+    brand.name = name ?? brand.name;
+    brand.shortDescription = shortDescription ?? brand.shortDescription;
+    brand.image = image ?? brand.image;
+    brand.status = status ?? brand.status;
+    brand.displayPriority = displayPriority ?? brand.displayPriority;
+ 
+    brand.lastModified = Date.now();
+
+    await brand.save();
+
+    return successResponse(res, "Brand updated successfully", brand);
+  } catch (error) {
+    console.error("Edit Brand Error:", error);
+    return errorResponse(res, "Failed to update Brand", 500);
+  }
+};
+
+
+// ✅ Delete Brand by recordId
+export const deleteBrand = async (req, res) => {
+  try {
+    const { recordId } = req.body;
+
+    if (!recordId) return errorResponse(res, "recordId is required", 400);
+
+    const deleted = await Brand.findOneAndDelete({ recordId });
+    if (!deleted) return errorResponse(res, "Brand not found", 404);
+
+    return successResponse(res, "Brand deleted successfully", deleted);
+  } catch (err) {
+    console.error("Delete Brand Error:", err);
+    return errorResponse(res, "Failed to delete Brand", 500);
+  }
+};
+
+// ✅ Get All Categories (optionally filter by type)
+export const getAllCategories = async (req, res) => {
+  try {
+    const { type } = req.query;
+    const filter = {};
+    if (type) filter.type = type;
+
+    const categories = await Brand.find(filter).sort({
+      displayPriority: 1,
+      creationTime: -1,
+    });
+
+    return successResponse(res, "Categories fetched successfully", categories);
+  } catch (err) {
+    console.error("Get All Categories Error:", err);
+    return errorResponse(res, "Failed to fetch categories", 500);
+  }
+};
+
+// ✅ Get Brand by recordId
+export const getBrandByRecordId = async (req, res) => {
+  try {
+    const { recordId } = req.body;
+    if (!recordId) return errorResponse(res, "recordId is required", 400);
+
+    const Brand = await Brand.findOne({ recordId });
+    if (!Brand) return errorResponse(res, "Brand not found", 404);
+
+    return successResponse(res, "Brand fetched successfully", Brand);
+  } catch (err) {
+    console.error("Get Brand Error:", err);
+    return errorResponse(res, "Failed to fetch Brand", 500);
+  }
+};
