@@ -10,6 +10,14 @@ const attributeSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const Features = new mongoose.Schema(
+  {
+    key: { type: String, required: true },
+    value: { type: String, required: true },
+  },
+  { _id: false }
+);
+
 const descriptionSchema = new mongoose.Schema(
   {
     text: { type: String },
@@ -61,6 +69,8 @@ const productSchema = new mongoose.Schema({
   productDescription: [descriptionSchema],
 
   attributes: [attributeSchema],
+
+  Features:[Features],
 
   ratings: {
     average: { type: Number, default: 0 },

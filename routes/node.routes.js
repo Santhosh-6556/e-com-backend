@@ -3,9 +3,10 @@ import {
   addNode,
   deleteNode,
   editNode,
-  getAllNodes,
+  getParentNodes,
   getNodeByRecordId,
   getNodeMenuData,
+  getAllNodes,
 } from "../controller/node.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 
@@ -17,9 +18,10 @@ router.get(
   authMiddleware(["admin"]),
   getNodeMenuData
 );
-router.get("/interface/get", authMiddleware(["admin"]), getAllNodes);
+router.get("/interface/get", authMiddleware(["admin"]), getParentNodes);
+router.get("/interface/", authMiddleware(["admin"]), getAllNodes);
 router.post("/interface/getedits", authMiddleware(["admin"]), editNode);
-router.delete("/interface/delete", authMiddleware(["admin"]), deleteNode);
+router.post("/interface/delete", authMiddleware(["admin"]), deleteNode);
 router.post("/interface/getedit", authMiddleware(["admin"]), getNodeByRecordId);
 
 

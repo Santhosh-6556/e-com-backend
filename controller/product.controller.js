@@ -42,9 +42,9 @@ export const addProduct = async (req, res) => {
     const product = await Product.create({
       ...data,
       recordId: generateRecordId(),
-      brand: brandData,             // optional
-      subcategory: subcategoryData, // optional
-      category: categoryData, // optional
+      brand: brandData,          
+      subcategory: subcategoryData, 
+      category: categoryData, 
       createdBy: req.user?.email || "system"
     });
 
@@ -292,3 +292,15 @@ export const getFilteredProducts = async (req, res) => {
   }
 };
 
+
+export const Products = async (req, res) => {
+  try {
+    const products = await Product.find()
+      .sort({ displayPriority: 1, creationTime: -1 });
+
+    return successResponse(res, "All products fetched successfully", products);
+  } catch (error) {
+    console.error("GetAll Products Error:", error);
+    return errorResponse(res, "Failed to fetch all nodes", 500);
+  }
+};

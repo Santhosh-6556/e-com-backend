@@ -18,7 +18,7 @@ app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/admin", nodeRoutes);
-app.use("/admin/products", productRoutes);
+app.use("/admin", productRoutes);
 app.use("/admin", categoryRoutes);
 app.use("/admin", brandRoutes);
 

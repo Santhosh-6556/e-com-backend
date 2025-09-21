@@ -7,6 +7,7 @@ import {
   getCategoryByRecordId,
   getCategories,
   getSubcategories,
+  Categories,
 } from "../controller/category.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 
@@ -20,6 +21,8 @@ router.get("/category/get", authMiddleware(["admin", "user"]), getAllCategories)
 router.post("/category/getedit", authMiddleware(["admin", "user"]), getCategoryByRecordId);
 router.get("/category/getCategories", getCategories);     
 router.get("/category/subcategories", getSubcategories); 
+router.get("/category", Categories); 
+
 
 
 export default router;

@@ -3,8 +3,9 @@ import {
   addBrand,
   editBrand,
   deleteBrand,
-  getAllCategories,
+  getAllBrand,
   getBrandByRecordId,
+  Brands,
 } from "../controller/brand.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 
@@ -14,7 +15,8 @@ const router = express.Router();
 router.post("/brand/add", authMiddleware(["admin"]), addBrand);
 router.post("/brand/edit", authMiddleware(["admin"]), editBrand);
 router.post("/brand/delete", authMiddleware(["admin"]), deleteBrand);
-router.get("/brand/get", authMiddleware(["admin", "user"]), getAllCategories);
+router.get("/brand/get", authMiddleware(["admin", "user"]), getAllBrand);
+router.get("/brand", authMiddleware(["admin", "user"]), Brands);
 router.post("/brand/getedit", authMiddleware(["admin", "user"]), getBrandByRecordId);
 
 export default router;

@@ -99,18 +99,18 @@ export const deleteBrand = async (req, res) => {
 };
 
 // ✅ Get All Categories (optionally filter by type)
-export const getAllCategories = async (req, res) => {
+export const getAllBrand = async (req, res) => {
   try {
     const { type } = req.query;
     const filter = {};
     if (type) filter.type = type;
 
-    const categories = await Brand.find(filter).sort({
+    const brand = await Brand.find(filter).sort({
       displayPriority: 1,
       creationTime: -1,
     });
 
-    return successResponse(res, "Categories fetched successfully", categories);
+    return successResponse(res, "Categories fetched successfully", brand);
   } catch (err) {
     console.error("Get All Categories Error:", err);
     return errorResponse(res, "Failed to fetch categories", 500);
@@ -123,12 +123,24 @@ export const getBrandByRecordId = async (req, res) => {
     const { recordId } = req.body;
     if (!recordId) return errorResponse(res, "recordId is required", 400);
 
-    const Brand = await Brand.findOne({ recordId });
-    if (!Brand) return errorResponse(res, "Brand not found", 404);
+    const brand = await Brand.findOne({ recordId });
+    if (!brand) return errorResponse(res, "Brand not found", 404);
 
-    return successResponse(res, "Brand fetched successfully", Brand);
+    return successResponse(res, "Brand fetched successfully", brand);
   } catch (err) {
     console.error("Get Brand Error:", err);
     return errorResponse(res, "Failed to fetch Brand", 500);
+  }
+};
+
+export const Brands = async (req, res) => {
+  try {
+    const brand = await Brand.find()
+      .sort({ displayPriority: 1, creationTime: -1 });
+
+    return successResponse(res, "All Category fetched successfully", brand);
+  } catch (error) {
+    console.error("GetAllCategory Error:", error);
+    return errorResponse(res, "Failed to fetch all nodes", 500);
   }
 };

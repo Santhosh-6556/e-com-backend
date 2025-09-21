@@ -67,7 +67,7 @@ export const editCategory = async (req, res) => {
       image,
       status,
       displayPriority,
-      parentCategory, // expecting { recordId: "..." }
+      parentCategory, // can be object, null, or undefined
     } = req.body;
 
     if (!recordId) {
@@ -80,15 +80,16 @@ export const editCategory = async (req, res) => {
       return errorResponse(res, "Category not found", 404);
     }
 
-    // Update parentCategory if provided
-    let parentData = category.parentCategory;
-    if (parentCategory?.recordId) {
+    // Handle parentCategory properly
+    if (parentCategory === null) {
+      category.parentCategory = null; // ✅ clear existing parent
+    } else if (parentCategory?.recordId) {
       const parent = await Category.findOne({ recordId: parentCategory.recordId });
       if (!parent) {
         return errorResponse(res, "Parent category not found", 404);
       }
 
-      parentData = {
+      category.parentCategory = {
         recordId: parent.recordId,
         identifier: parent.identifier,
         name: parent.name,
@@ -96,15 +97,15 @@ export const editCategory = async (req, res) => {
         image: parent.image,
       };
     }
+    // if parentCategory is undefined → don’t touch existing
 
-    // Update fields
+    // Update other fields
     category.identifier = identifier ?? category.identifier;
     category.name = name ?? category.name;
     category.shortDescription = shortDescription ?? category.shortDescription;
     category.image = image ?? category.image;
     category.status = status ?? category.status;
     category.displayPriority = displayPriority ?? category.displayPriority;
-    category.parentCategory = parentData;
     category.lastModified = Date.now();
 
     await category.save();
@@ -115,6 +116,7 @@ export const editCategory = async (req, res) => {
     return errorResponse(res, "Failed to update category", 500);
   }
 };
+
 
 
 // ✅ Delete Category by recordId
@@ -198,3 +200,15 @@ export const getSubcategories = async (req, res) => {
   }
 };
 
+
+export const Categories = async (req, res) => {
+  try {
+    const category = await Category.find()
+      .sort({ displayPriority: 1, creationTime: -1 });
+
+    return successResponse(res, "All Category fetched successfully", category);
+  } catch (error) {
+    console.error("GetAllCategory Error:", error);
+    return errorResponse(res, "Failed to fetch all nodes", 500);
+  }
+};

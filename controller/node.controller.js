@@ -12,25 +12,33 @@ export const addNode = async (req, res) => {
       return errorResponse(res, "Identifier already present", 400);
     }
 
-    // Resolve parentNode if recordId is sent
+    // Normalize parentNode input
     let parentData = null;
-    if (parentNode?.recordId) {
-      const parent = await Node.findOne({ recordId: parentNode.recordId });
-      if (!parent) {
-        return errorResponse(res, "Parent node not found", 404);
+    if (parentNode) {
+      // Handle if frontend sent string, { recordId }, or whole object
+      const parentRecordId = 
+        typeof parentNode === "string"
+          ? parentNode
+          : parentNode.recordId;
+
+      if (parentRecordId) {
+        const parent = await Node.findOne({ recordId: parentRecordId });
+        if (!parent) {
+          return errorResponse(res, "Parent node not found", 404);
+        }
+
+        parentData = {
+          path: parent.path,
+          name: parent.name,
+          recordId: parent.recordId,
+          status: parent.status,
+          identifier: parent.identifier,
+        };
       }
-      parentData = {
-        path: parent.path,
-        name: parent.name,
-        recordId: parent.recordId,
-        status: parent.status,
-        identifier: parent.identifier,
-      };
     }
 
     const userEmail = req.user?.email || "unknown";
 
-  
     const newNode = await Node.create({
       path,
       parentNode: parentData,
@@ -51,6 +59,7 @@ export const addNode = async (req, res) => {
   }
 };
 
+
 export const getNodeMenuData = async (req, res) => {
   try {
 
@@ -70,7 +79,7 @@ export const getNodeMenuData = async (req, res) => {
   }
 };
 
-export const getAllNodes = async (req, res) => {
+export const getParentNodes = async (req, res) => {
   try {
     const { identifier } = req.query;
 
@@ -115,16 +124,15 @@ export const getAllNodes = async (req, res) => {
 
 export const editNode = async (req, res) => {
   try {
-    const { path, parentNode, displayPriority, shortDescription, identifier } =
-      req.body;
+    const { recordId, path, parentNode, displayPriority, shortDescription, identifier } = req.body;
 
-    // Check if identifier is provided
-    if (!identifier) {
-      return errorResponse(res, "Identifier is required to edit node", 400);
+    // Require recordId instead of identifier
+    if (!recordId) {
+      return errorResponse(res, "recordId is required to edit node", 400);
     }
 
-    // Find node by identifier
-    const node = await Node.findOne({ identifier });
+    // Find node by recordId
+    const node = await Node.findOne({ recordId });
     if (!node) {
       return errorResponse(res, "Node not found", 404);
     }
@@ -132,21 +140,42 @@ export const editNode = async (req, res) => {
     // Update fields
     node.path = path ?? node.path;
     node.identifier = identifier ?? node.identifier;
-    node.parentNode = parentNode ?? node.parentNode;
     node.displayPriority = displayPriority ?? node.displayPriority;
     node.shortDescription = shortDescription ?? node.shortDescription;
 
+    // Handle parentNode properly
+    if (parentNode === null) {
+      node.parentNode = null; // clear existing parent
+    } else if (parentNode?.recordId) {
+      // re-fetch parent from DB
+      const parent = await Node.findOne({ recordId: parentNode.recordId });
+      if (!parent) {
+        return errorResponse(res, "Parent node not found", 404);
+      }
+      node.parentNode = {
+        path: parent.path,
+        name: parent.name,
+        recordId: parent.recordId,
+        status: parent.status,
+        identifier: parent.identifier,
+      };
+    }
+    // if parentNode is undefined → leave as is
+
     // Track who modified
     node.modifiedBy = req.user?.email || "unknown";
+    node.lastModified = Date.now();
 
     await node.save();
 
     return successResponse(res, "Node updated successfully", node);
   } catch (error) {
-    console.error(error);
+    console.error("Edit Node Error:", error);
     return errorResponse(res, "Failed to update node", 500);
   }
 };
+
+
 
 export const deleteNode = async (req, res) => {
   try {
@@ -196,3 +225,14 @@ export const getNodeByRecordId = async (req, res) => {
   }
 };
 
+export const getAllNodes = async (req, res) => {
+  try {
+    const nodes = await Node.find()
+      .sort({ displayPriority: 1, creationTime: -1 });
+
+    return successResponse(res, "All nodes fetched successfully", nodes);
+  } catch (error) {
+    console.error("GetAllNodes Error:", error);
+    return errorResponse(res, "Failed to fetch all nodes", 500);
+  }
+};
