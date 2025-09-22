@@ -228,18 +228,19 @@ export const getAllProducts = async (req, res) => {
   }
 };
 
-// ✅ View Particular Product by recordId
+
 export const getProductByRecordId = async (req, res) => {
   try {
-    const { recordId } = req.params;
+    const { recordId } = req.body;
+    if (!recordId) return errorResponse(res, "recordId is required", 400);
 
     const product = await Product.findOne({ recordId });
     if (!product) return errorResponse(res, "Product not found", 404);
 
     return successResponse(res, "Product fetched successfully", product);
-  } catch (error) {
-    console.error("GetProduct Error:", error);
-    return errorResponse(res, "Failed to fetch product", 500);
+  } catch (err) {
+    console.error("Get product Error:", err);
+    return errorResponse(res, "Failed to fetch Product", 500);
   }
 };
 

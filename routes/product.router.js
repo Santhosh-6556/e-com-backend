@@ -16,7 +16,7 @@ router.post("/products/add", authMiddleware(["admin"]), addProduct);
 router.post("/products/edit", authMiddleware(["admin"]), editProduct);
 router.post("/products/delete", authMiddleware(["admin"]), deleteProduct);
 router.get("/products/get", getAllProducts);
-router.get("/products/:recordId", authMiddleware(["admin", "user"]), getProductByRecordId);
+router.post("/products/getedit", authMiddleware(["admin", "user"]), getProductByRecordId);
 router.post("/products/filter", getFilteredProducts);
 router.get("/products", Products);
 

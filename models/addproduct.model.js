@@ -51,7 +51,7 @@ const productSchema = new mongoose.Schema({
     identifier: { type: String },
   },
    category: {
-    recordId: { type: String },
+    recordId: { type: String ,required:true },
     identifier: { type: String },
   },
 
