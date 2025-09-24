@@ -4,47 +4,30 @@ import { generateRecordId } from "../utils/recordId.js";
 import { successResponse, errorResponse } from "../utils/response.js";
 import Category from "../models/category.model.js";
 import Brand from "../models/brand.model.js";
+import { uploadImage } from "../utils/uploadImage.js";
 
 export const addProduct = async (req, res) => {
   try {
     const data = req.body;
 
-    // ✅ Handle brand (optional)
-    let brandData = null;
-    if (data.brand?.recordId) {
-      const brand = await Brand.findOne({ recordId: data.brand.recordId });
-      if (!brand) {
-        return errorResponse(res, "Invalid brand recordId", 400);
-      }
-      brandData = { recordId: brand.recordId, identifier: brand.identifier };
-    }
+    // Process images (base64 -> URL)
+    const images = await Promise.all((data.images || []).map(uploadImage));
+    const carouselImages = await Promise.all((data.carouselImages || []).map(uploadImage));
 
-    // ✅ Handle subcategory (optional)
-    let subcategoryData = null;
-    if (data.subcategory?.recordId) {
-      const subCat = await Category.findOne({ recordId: data.subcategory.recordId });
-      if (!subCat) {
-        return errorResponse(res, "Invalid subcategory recordId", 400);
-      }
-      subcategoryData = { recordId: subCat.recordId, identifier: subCat.identifier };
-    }
-
-
-     let categoryData = null;
-    if (data.category?.recordId) {
-      const category = await Category.findOne({ recordId: data.category.recordId });
-      if (!category) {
-        return errorResponse(res, "Invalid subcategory recordId", 400);
-      }
-      categoryData = { recordId: category.recordId, identifier: category.identifier };
-    }
+    // Process productDescription images (if present)
+    const productDescription = await Promise.all(
+      (data.productDescription || []).map(async (desc) => ({
+        text: desc.text,
+        image: desc.image ? await uploadImage(desc.image) : null,
+      }))
+    );
 
     const product = await Product.create({
       ...data,
       recordId: generateRecordId(),
-      brand: brandData,          
-      subcategory: subcategoryData, 
-      category: categoryData, 
+      images,
+      carouselImages,
+      productDescription,
       createdBy: req.user?.email || "system"
     });
 
@@ -68,123 +51,93 @@ export const editProduct = async (req, res) => {
       return errorResponse(res, "Product not found", 404);
     }
 
-
+   
     if ("brand" in updates) {
       if (updates.brand === null) {
         product.brand = null;
       } else if (updates.brand?.recordId) {
         const brand = await Brand.findOne({ recordId: updates.brand.recordId });
-        if (!brand) {
-          return errorResponse(res, "Invalid brand recordId", 400);
-        }
-        product.brand = {
-          recordId: brand.recordId,
-          identifier: brand.identifier,
-        };
-      } else {
-        product.brand = null;
+        if (!brand) return errorResponse(res, "Invalid brand recordId", 400);
+        product.brand = { recordId: brand.recordId, identifier: brand.identifier };
       }
-    } else {
-      product.brand = null; 
     }
 
-   
+
     if ("subcategory" in updates) {
       if (updates.subcategory === null) {
         product.subcategory = null;
       } else if (updates.subcategory?.recordId) {
         const subCat = await Category.findOne({ recordId: updates.subcategory.recordId });
-        if (!subCat) {
-          return errorResponse(res, "Invalid subcategory recordId", 400);
-        }
-        product.subcategory = {
-          recordId: subCat.recordId,
-          identifier: subCat.identifier,
-        };
-      } else {
-        product.subcategory = null;
+        if (!subCat) return errorResponse(res, "Invalid subcategory recordId", 400);
+        product.subcategory = { recordId: subCat.recordId, identifier: subCat.identifier };
       }
-    } else {
-      product.subcategory = null;
     }
 
-     if ("category" in updates) {
+
+    if ("category" in updates) {
       if (updates.category === null) {
         product.category = null;
       } else if (updates.category?.recordId) {
         const category = await Category.findOne({ recordId: updates.category.recordId });
-        if (!category) {
-          return errorResponse(res, "Invalid subcategory recordId", 400);
-        }
-        product.category = {
-          recordId: category.recordId,
-          identifier: category.identifier,
-        };
-      } else {
-        product.category = null;
+        if (!category) return errorResponse(res, "Invalid category recordId", 400);
+        product.category = { recordId: category.recordId, identifier: category.identifier };
       }
-    } else {
-      product.category = null;
     }
-    // ✅ Ratings
+
+    
     if ("ratings" in updates) {
-      if (updates.ratings === null) {
-        product.ratings = { average: 0, count: 0 };
-      } else {
-        product.ratings = updates.ratings;
-      }
-    } else {
-      product.ratings = { average: 0, count: 0 };
+      product.ratings = updates.ratings ?? { average: 0, count: 0 };
     }
 
-    // ✅ Reviews
+
     if ("reviews" in updates) {
-      if (updates.reviews === null) {
-        product.reviews = [];
-      } else if (Array.isArray(updates.reviews)) {
-        product.reviews = updates.reviews;
-      }
-    } else {
-      product.reviews = [];
+      product.reviews = Array.isArray(updates.reviews) ? updates.reviews : [];
     }
 
-    const arrayFields = [
-      "images",
-      "carouselImages",
-      "highlights",
-      "productDescription",
-      "attributes",
-    ];
+ 
+    if ("images" in updates) {
+      product.images = await Promise.all(
+        (updates.images || []).map(async (img) =>
+          img.startsWith("http") ? img : await uploadImage(img)
+        )
+      );
+    }
 
-    arrayFields.forEach((field) => {
+    if ("carouselImages" in updates) {
+      product.carouselImages = await Promise.all(
+        (updates.carouselImages || []).map(async (img) =>
+          img.startsWith("http") ? img : await uploadImage(img)
+        )
+      );
+    }
+
+   
+    if ("productDescription" in updates) {
+      product.productDescription = await Promise.all(
+        (updates.productDescription || []).map(async (desc) => ({
+          text: desc.text,
+          image: desc.image
+            ? (desc.image.startsWith("http") ? desc.image : await uploadImage(desc.image))
+            : null,
+        }))
+      );
+    }
+
+  
+    ["highlights", "attributes", "Features"].forEach((field) => {
       if (field in updates) {
-        if (updates[field] === null) {
-          product[field] = [];
-        } else {
+        product[field] = updates[field] || [];
+      }
+    });
+
+  
+    ["name", "price", "discountPrice", "stock", "status", "description", "identifier"].forEach(
+      (field) => {
+        if (field in updates) {
           product[field] = updates[field];
         }
-      } else {
-        product[field] = [];
       }
-    });
-
-    // ✅ Scalars
-    const scalarFields = [
-      "name",
-      "price",
-      "discountPrice",
-      "stock",
-      "status",
-      "description",
-      "identifier"
-    ];
-
-    scalarFields.forEach((field) => {
-      if (field in updates) {
-        product[field] = updates[field];
-      }
-    });
-
+    );
 
     product.modifiedBy = req.user?.email || "system";
     product.lastModified = Date.now();
