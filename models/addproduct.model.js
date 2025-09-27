@@ -39,9 +39,10 @@ const reviewSchema = new mongoose.Schema(
 
 const productSchema = new mongoose.Schema({
   recordId: { type: String, required: true, unique: true },
-  // Basic info
-  name: { type: String,},
+  
+  name: { type: String },
   identifier: { type: String, required: true },
+  slug: { type: String, required: true },
   brand: {
     recordId: { type: String },
     identifier: { type: String },
@@ -50,8 +51,8 @@ const productSchema = new mongoose.Schema({
     recordId: { type: String },
     identifier: { type: String },
   },
-   category: {
-    recordId: { type: String ,required:true },
+  category: {
+    recordId: { type: String, required: true },
     identifier: { type: String },
   },
 
@@ -61,6 +62,7 @@ const productSchema = new mongoose.Schema({
 
   stock: { type: Number, default: 0 },
   status: { type: Boolean, default: true },
+  isTrending: { type: Boolean, default: false },
 
   images: [{ type: String }],
   carouselImages: [{ type: String }],
@@ -70,7 +72,7 @@ const productSchema = new mongoose.Schema({
 
   attributes: [attributeSchema],
 
-  Features:[Features],
+  Features: [Features],
 
   ratings: {
     average: { type: Number, default: 0 },

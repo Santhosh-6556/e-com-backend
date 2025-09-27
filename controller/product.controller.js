@@ -10,11 +10,9 @@ export const addProduct = async (req, res) => {
   try {
     const data = req.body;
 
-    // Process images (base64 -> URL)
     const images = await Promise.all((data.images || []).map(uploadImage));
     const carouselImages = await Promise.all((data.carouselImages || []).map(uploadImage));
 
-    // Process productDescription images (if present)
     const productDescription = await Promise.all(
       (data.productDescription || []).map(async (desc) => ({
         text: desc.text,
@@ -131,7 +129,7 @@ export const editProduct = async (req, res) => {
     });
 
   
-    ["name", "price", "discountPrice", "stock", "status", "description", "identifier"].forEach(
+    ["name", "price", "discountPrice", "stock", "status", "description", "identifier","slug","isTrending"].forEach(
       (field) => {
         if (field in updates) {
           product[field] = updates[field];
@@ -197,7 +195,20 @@ export const getProductByRecordId = async (req, res) => {
   }
 };
 
+export const getProductByslug = async (req, res) => {
+  try {
+    const { slug } = req.body;
+    if (!slug) return errorResponse(res, "recordId is required", 400);
 
+    const product = await Product.findOne({ slug });
+    if (!product) return errorResponse(res, "Product not found", 404);
+
+    return successResponse(res, "Product fetched successfully", product);
+  } catch (err) {
+    console.error("Get product Error:", err);
+    return errorResponse(res, "Failed to fetch Product", 500);
+  }
+};
 
 export const getFilteredProducts = async (req, res) => {
   try {
