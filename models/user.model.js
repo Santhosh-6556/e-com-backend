@@ -13,12 +13,13 @@ const addressSchema = new mongoose.Schema(
 
 const userSchema = new mongoose.Schema(
   {
-    recordId:{
-      type:String,
+    recordId: {
+      type: String,
+      required: true,
+      unique: true
     },
     name: {
       type: String,
-      required: true,
       trim: true,
     },
     email: {
@@ -29,11 +30,6 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
-    },
-       confirmPassword: {
-      type: String,
-      required: true,
     },
     role: {
       type: String,
@@ -41,12 +37,25 @@ const userSchema = new mongoose.Schema(
       default: "user",
     },
     phone: {
-      type: String,
+      type: Number,
     },
     addresses: [addressSchema],
     isActive: {
       type: Boolean,
       default: true,
+    },
+    otp: {
+      type: String,
+    },
+    otpExpires: {
+      type: Date,
+    },
+    otpLastSent: {
+      type: Date,
+    },
+    otpAttempts: {
+      type: Number,
+      default: 0,
     },
   },
   { timestamps: true }

@@ -1,22 +1,28 @@
 import express from "express";
-import { login, register } from "../controller/auth.controller.js";
+import {
+  login,
+  verifyOTP,
+  adminLogin,
+  resendOTP,
+} from "../controller/auth.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-router.post("/register", register);
-
 router.post("/login", login);
+
+router.post("/resend-otp", resendOTP);
+
+router.post("/verify-otp", verifyOTP);
+
+router.post("/admin-login", adminLogin);
 
 router.get("/demo", authMiddleware(["admin"]), (req, res) => {
   res.send("SBV Backend is running 🚀");
 });
 
-
-// In-memory messages storage
 const messages = [];
 
-// GET all messages
 router.get("/getmessage", (req, res) => {
   res.json(messages);
 });
@@ -30,7 +36,6 @@ router.post("/sendmessage", (req, res) => {
   messages.push(message);
   res.status(201).json(message);
 });
-
 
 export default router;
 export { messages };

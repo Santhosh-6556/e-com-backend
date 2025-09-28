@@ -19,7 +19,7 @@ router.get(
   getNodeMenuData
 );
 router.get("/interface/get", authMiddleware(["admin"]), getParentNodes);
-router.get("/interface/", authMiddleware(["admin"]), getAllNodes);
+router.get("/interface", authMiddleware(["admin"]), getAllNodes);
 router.post("/interface/getedits", authMiddleware(["admin"]), editNode);
 router.post("/interface/delete", authMiddleware(["admin"]), deleteNode);
 router.post("/interface/getedit", authMiddleware(["admin"]), getNodeByRecordId);
