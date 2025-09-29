@@ -8,6 +8,7 @@ import brandRoutes from "./routes/brand.routes.js";
 import wishlist from "./routes/wishlist.routes.js"; 
 import path from "path";
 import bodyParser from "body-parser";
+import banner from "./routes/banner.routes.js"
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use("/admin", productRoutes);
 app.use("/admin", categoryRoutes);
 app.use("/admin", brandRoutes);
 app.use("/admin", wishlist);
+app.use("/admin", banner);
 
 app.get("/ping", (req, res) => {
   res.send("pong");
