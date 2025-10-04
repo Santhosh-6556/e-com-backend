@@ -212,3 +212,15 @@ export const Categories = async (req, res) => {
     return errorResponse(res, "Failed to fetch all nodes", 500);
   }
 };
+
+export const getCategory = async (req, res) => {
+  try {
+    const category = await Category.find()
+      .sort({ displayPriority: 1, creationTime: -1 });
+
+    return successResponse(res, "All Category fetched successfully", category);
+  } catch (error) {
+    console.error("GetAllCategory Error:", error);
+    return errorResponse(res, "Failed to fetch all nodes", 500);
+  }
+};

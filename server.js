@@ -1,7 +1,7 @@
 // server.js (ESM version)
 import dotenv from "dotenv";
 import app from "./app.js";
-import http from "http"
+import http from "http";
 import { Server } from "socket.io"; // socket.io
 import connectDB from "./config/db.js";
 import { messages } from "./routes/auth.routes.js";
@@ -13,13 +13,12 @@ connectDB();
 
 const server = http.createServer(app);
 
-const io =new  Server(server,{
+const io = new Server(server, {
   cors: {
     origin: "*", // allow all origins for testing
     methods: ["GET", "POST"],
   },
-})
-
+});
 
 // Handle Socket.IO connections
 io.on("connection", (socket) => {
@@ -31,10 +30,9 @@ io.on("connection", (socket) => {
   // Listen for new message
   socket.on("message", (data) => {
     const message = { id: socket.id, text: data, time: new Date() };
-    messages.push(message);       // store in memory
+    messages.push(message); // store in memory
     // io.emit("message", message);  // broadcast to all clients
     socket.emit("message", message);
-
   });
 
   socket.on("disconnect", () => {

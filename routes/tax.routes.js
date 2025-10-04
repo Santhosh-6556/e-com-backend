@@ -9,10 +9,11 @@ import {
 import { authMiddleware } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
+router.use(authMiddleware(["user", "admin"]));
 
-router.post("/tax/add", authMiddleware(["admin"]), addTax);
-router.post("/tax/edit", authMiddleware(["admin"]), editTax);
-router.post("/tax/delete", authMiddleware(["admin"]), deleteTax);
+router.post("/tax/add", addTax);
+router.post("/tax/edit", editTax);
+router.post("/tax/delete", deleteTax);
 router.get("/tax", getAllTaxes);
 router.post("/tax/get", getTaxByRecordId);
 
