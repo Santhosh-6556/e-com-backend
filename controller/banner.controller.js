@@ -119,11 +119,7 @@ export const getBanners = async (req, res) => {
     if (status !== undefined) query.status = status === 'true';
    
     query.status = true;
-    query.$or = [
-      { endDate: { $exists: false } },
-      { endDate: null },
-      { endDate: { $gte: new Date() } }
-    ];
+  
     query.startDate = { $lte: new Date() };
 
     const banners = await Banner.find(query)
@@ -176,7 +172,26 @@ export const recordBannerClick = async (req, res) => {
 
 export const getAllBanners = async (req, res) => {
   try {
-    const banners = await Banner.find()
+    const { includeExpired = 'false', includeInactive = 'false' } = req.query;
+    
+    const query = {};
+    
+    // Only filter by status if includeInactive is false
+    if (includeInactive === 'false') {
+      query.status = true;
+    }
+    
+    // Only filter by dates if includeExpired is false
+    if (includeExpired === 'false') {
+      query.$or = [
+        { endDate: { $exists: false } },
+        { endDate: null },
+        { endDate: { $gte: new Date() } }
+      ];
+      query.startDate = { $lte: new Date() };
+    }
+
+    const banners = await Banner.find(query)
       .sort({ type: 1, position: 1, creationTime: -1 });
 
     return successResponse(res, "All banners fetched successfully", banners);

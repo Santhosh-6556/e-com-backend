@@ -9,6 +9,8 @@ import wishlist from "./routes/wishlist.routes.js";
 import path from "path";
 import bodyParser from "body-parser";
 import banner from "./routes/banner.routes.js"
+import tax from "./routes/tax.routes.js"
+import publicBanner from "./routes/public-banner.routes.js" // Add this
 
 const app = express();
 
@@ -19,6 +21,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(bodyParser.json({ limit: "50mb" })); 
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/admin", nodeRoutes);
@@ -26,7 +29,9 @@ app.use("/admin", productRoutes);
 app.use("/admin", categoryRoutes);
 app.use("/admin", brandRoutes);
 app.use("/admin", wishlist);
-app.use("/admin", banner);
+app.use("/admin", banner); 
+app.use("/admin", tax);
+app.use("/api", publicBanner); 
 
 app.get("/ping", (req, res) => {
   res.send("pong");

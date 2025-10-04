@@ -7,7 +7,7 @@ import { sendEmail } from "../utils/mailer.js";
 
 const ADMIN_CREDENTIALS = {
   email: "admin@gmail.com",
-  password: "admin@12345",
+  password: "welcome12345",
 };
 
 
