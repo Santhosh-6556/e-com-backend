@@ -5,10 +5,9 @@ import {
   deleteCategory,
   getAllCategories,
   getCategoryByRecordId,
-  getCategories,
-  getSubcategories,
-  Categories,
   getCategory,
+  getAdminSubcategories,
+  getAdminCategories,
 } from "../controller/category.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 
@@ -20,5 +19,7 @@ router.post("/category/delete", authMiddleware(["admin"]), deleteCategory);
 router.get("/category/get", authMiddleware(["admin", "user"]), getAllCategories);
 router.post("/category/getedit", authMiddleware(["admin", "user"]), getCategoryByRecordId);
 router.get("/category", authMiddleware(["admin", "user"]), getCategory);
+router.get("/category/get", authMiddleware(["admin", "user"]), getAdminCategories);
+router.get("/subcategories/get", authMiddleware(["admin", "user"]), getAdminSubcategories);
 
 export default router;

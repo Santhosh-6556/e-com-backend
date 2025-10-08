@@ -39,8 +39,7 @@ const reviewSchema = new mongoose.Schema(
 
 const productSchema = new mongoose.Schema({
   recordId: { type: String, required: true, unique: true },
-  
-  name: { type: String },
+
   identifier: { type: String, required: true },
   slug: { type: String, required: true },
   brand: {
@@ -55,7 +54,10 @@ const productSchema = new mongoose.Schema({
     recordId: { type: String, required: true },
     identifier: { type: String },
   },
-
+  tax: {
+    recordId: { type: String },
+    identifier: { type: String },
+  },
   price: { type: Number, required: true },
   discountPrice: { type: Number },
   offer: { type: Number, default: 0 },

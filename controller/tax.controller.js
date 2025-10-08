@@ -107,3 +107,13 @@ export const getTaxByRecordId = async (req, res) => {
     return errorResponse(res, "Failed to fetch Tax", 500);
   }
 };
+
+export const getTaxes = async (req, res) => {
+  try {
+    const taxes = await Tax.find();
+    return successResponse(res, "Taxes fetched successfully", taxes);
+  } catch (error) {
+    console.error("Get All Taxes Error:", error);
+    return errorResponse(res, "Failed to fetch taxes", 500);
+  }
+};

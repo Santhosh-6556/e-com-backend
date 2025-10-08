@@ -1,19 +1,22 @@
 import Category from "../models/category.model.js";
+import { generateRecordId } from "../utils/recordId.js";
 import { errorResponse, successResponse } from "../utils/response.js";
 
-// Utility: generate recordId
-const generateRecordId = () => Date.now().toString();
-
-// ✅ Add Category
 export const addCategory = async (req, res) => {
   try {
-    const { identifier, name, shortDescription, image,displayPriority, parentCategory } = req.body;
+    const {
+      identifier,
+      name,
+      shortDescription,
+      image,
+      displayPriority,
+      parentCategory,
+    } = req.body;
 
     if (!identifier) {
       return errorResponse(res, "Identifier is required", 400);
     }
 
-    // Check duplicate identifier
     const existing = await Category.findOne({ identifier });
     if (existing) {
       return errorResponse(res, "Identifier already exists", 400);
@@ -21,9 +24,10 @@ export const addCategory = async (req, res) => {
 
     let parentData = null;
 
-    // If parentCategory object with recordId is provided
     if (parentCategory?.recordId) {
-      const parent = await Category.findOne({ recordId: parentCategory.recordId });
+      const parent = await Category.findOne({
+        recordId: parentCategory.recordId,
+      });
       if (!parent) {
         return errorResponse(res, "Parent category not found", 404);
       }
@@ -84,7 +88,9 @@ export const editCategory = async (req, res) => {
     if (parentCategory === null) {
       category.parentCategory = null; // ✅ clear existing parent
     } else if (parentCategory?.recordId) {
-      const parent = await Category.findOne({ recordId: parentCategory.recordId });
+      const parent = await Category.findOne({
+        recordId: parentCategory.recordId,
+      });
       if (!parent) {
         return errorResponse(res, "Parent category not found", 404);
       }
@@ -117,9 +123,6 @@ export const editCategory = async (req, res) => {
   }
 };
 
-
-
-// ✅ Delete Category by recordId
 export const deleteCategory = async (req, res) => {
   try {
     const { recordId } = req.body;
@@ -136,7 +139,6 @@ export const deleteCategory = async (req, res) => {
   }
 };
 
-// ✅ Get All Categories (optionally filter by type)
 export const getAllCategories = async (req, res) => {
   try {
     const { type } = req.query;
@@ -155,7 +157,6 @@ export const getAllCategories = async (req, res) => {
   }
 };
 
-// ✅ Get Category by recordId
 export const getCategoryByRecordId = async (req, res) => {
   try {
     const { recordId } = req.body;
@@ -178,33 +179,43 @@ export const getCategories = async (req, res) => {
       creationTime: -1,
     });
 
-    return successResponse(res, "Parent categories fetched successfully", categories);
+    return successResponse(
+      res,
+      "Parent categories fetched successfully",
+      categories
+    );
   } catch (err) {
     console.error("Get Parent Categories Error:", err);
     return errorResponse(res, "Failed to fetch parent categories", 500);
   }
 };
 
-
 export const getSubcategories = async (req, res) => {
   try {
-    const subcategories = await Category.find({ parentCategory: { $ne: null } }).sort({
+    const subcategories = await Category.find({
+      parentCategory: { $ne: null },
+    }).sort({
       displayPriority: 1,
       creationTime: -1,
     });
 
-    return successResponse(res, "Subcategories fetched successfully", subcategories);
+    return successResponse(
+      res,
+      "Subcategories fetched successfully",
+      subcategories
+    );
   } catch (err) {
     console.error("Get Subcategories Error:", err);
     return errorResponse(res, "Failed to fetch subcategories", 500);
   }
 };
 
-
 export const Categories = async (req, res) => {
   try {
-    const category = await Category.find()
-      .sort({ displayPriority: 1, creationTime: -1 });
+    const category = await Category.find().sort({
+      displayPriority: 1,
+      creationTime: -1,
+    });
 
     return successResponse(res, "All Category fetched successfully", category);
   } catch (error) {
@@ -215,12 +226,48 @@ export const Categories = async (req, res) => {
 
 export const getCategory = async (req, res) => {
   try {
-    const category = await Category.find()
-      .sort({ displayPriority: 1, creationTime: -1 });
+    const category = await Category.find().sort({
+      displayPriority: 1,
+      creationTime: -1,
+    });
 
     return successResponse(res, "All Category fetched successfully", category);
   } catch (error) {
     console.error("GetAllCategory Error:", error);
     return errorResponse(res, "Failed to fetch all nodes", 500);
+  }
+};
+
+export const getAdminCategories = async (req, res) => {
+  try {
+    const category = await Category.find().sort({
+      displayPriority: 1,
+      creationTime: -1,
+    });
+
+    return successResponse(res, "All Category fetched successfully", category);
+  } catch (error) {
+    console.error("GetAllCategory Error:", error);
+    return errorResponse(res, "Failed to fetch all nodes", 500);
+  }
+};
+
+export const getAdminSubcategories = async (req, res) => {
+  try {
+    const subcategories = await Category.find({
+      parentCategory: { $ne: null },
+    }).sort({
+      displayPriority: 1,
+      creationTime: -1,
+    });
+
+    return successResponse(
+      res,
+      "Subcategories fetched successfully",
+      subcategories
+    );
+  } catch (err) {
+    console.error("Get Subcategories Error:", err);
+    return errorResponse(res, "Failed to fetch subcategories", 500);
   }
 };

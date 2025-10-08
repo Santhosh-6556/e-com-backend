@@ -5,6 +5,7 @@ import {
   deleteTax,
   getAllTaxes,
   getTaxByRecordId,
+  getTaxes,
 } from "../controller/tax.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 
@@ -15,6 +16,7 @@ router.post("/tax/add", addTax);
 router.post("/tax/edit", editTax);
 router.post("/tax/delete", deleteTax);
 router.get("/tax", getAllTaxes);
-router.post("/tax/get", getTaxByRecordId);
+router.post("/tax/getedit", getTaxByRecordId);
+router.get("/tax/get", getTaxes);
 
 export default router;
