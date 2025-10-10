@@ -134,6 +134,7 @@ export const addToCart = async (req, res) => {
         images: product.images,
         stock: product.stock,
         status: product.status,
+        taxRecordId: product.tax?.recordId || null,
       };
 
       cart.items.push({

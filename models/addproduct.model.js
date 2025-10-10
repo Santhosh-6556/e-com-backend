@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import Tax from "../models/tax.model.js"; 
 
 const attributeSchema = new mongoose.Schema(
   {
@@ -58,9 +59,11 @@ const productSchema = new mongoose.Schema({
     recordId: { type: String },
     identifier: { type: String },
   },
-  price: { type: Number, required: true },
-  discountPrice: { type: Number },
-  offer: { type: Number, default: 0 },
+  price: { type: Number, required: true }, 
+  discountPrice: { type: Number },         
+  offer: { type: Number, default: 0 },    
+
+  sellingPrice: { type: Number, default: 0 }, 
 
   stock: { type: Number, default: 0 },
   status: { type: Boolean, default: true },
@@ -73,7 +76,6 @@ const productSchema = new mongoose.Schema({
   productDescription: [descriptionSchema],
 
   attributes: [attributeSchema],
-
   Features: [Features],
 
   ratings: {
@@ -89,8 +91,10 @@ const productSchema = new mongoose.Schema({
   lastModified: { type: Date, default: Date.now },
 });
 
-productSchema.pre("save", function (next) {
+
+productSchema.pre("save", async function (next) {
   this.lastModified = Date.now();
+
 
   if (this.price && this.discountPrice) {
     this.offer = Math.round(
@@ -100,6 +104,7 @@ productSchema.pre("save", function (next) {
     this.offer = 0;
   }
 
+  // 2. Calculate Ratings
   if (this.reviews && this.reviews.length > 0) {
     const total = this.reviews.reduce((sum, r) => sum + r.rating, 0);
     this.ratings.average = parseFloat((total / this.reviews.length).toFixed(1));
@@ -108,6 +113,30 @@ productSchema.pre("save", function (next) {
     this.ratings.average = 0;
     this.ratings.count = 0;
   }
+
+
+  let basePrice = this.discountPrice || this.price; 
+  let sellingPrice = basePrice;
+
+  if (this.tax && this.tax.recordId) {
+    try {
+      const taxRecord = await mongoose.model("Tax").findOne({
+        recordId: this.tax.recordId,
+        status: true,
+      });
+
+      if (taxRecord && taxRecord.rate) {
+        const taxRate = parseFloat(taxRecord.rate);
+        if (!isNaN(taxRate)) {
+          sellingPrice = basePrice + (basePrice * taxRate) / 100;
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching tax:", err);
+    }
+  }
+
+  this.sellingPrice = parseFloat(sellingPrice.toFixed(2));
 
   next();
 });

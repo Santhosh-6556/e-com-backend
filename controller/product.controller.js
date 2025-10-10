@@ -66,7 +66,7 @@ export const editProduct = async (req, res) => {
       if (updates.tax === null) {
         product.tax = null;
       } else if (updates.tax?.recordId) {
-        const tax = await Tax.findOne({ recordId: updates.brand.recordId });
+        const tax = await Tax.findOne({ recordId: updates.tax.recordId });
         if (!tax) return errorResponse(res, "Invalid tax recordId", 400);
         product.tax = { recordId: tax.recordId, identifier: tax.identifier };
       }

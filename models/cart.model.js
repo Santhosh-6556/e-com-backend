@@ -1,10 +1,11 @@
 import mongoose from "mongoose";
+import Tax from "../models/tax.model.js"; 
 
 const cartItemSchema = new mongoose.Schema(
   {
     product: {
       recordId: { type: String, required: true },
-      name: { type: String, required: true },
+      name: { type: String, },
       identifier: { type: String, required: true },
       slug: { type: String, required: true },
       price: { type: Number, required: true },
@@ -12,6 +13,8 @@ const cartItemSchema = new mongoose.Schema(
       images: [{ type: String }],
       stock: { type: Number, required: true },
       status: { type: Boolean, default: true },
+      taxRecordId: { type: String },   
+      taxRate: { type: Number, default: 0 },
     },
     quantity: { type: Number, required: true, min: 1, default: 1 },
     selectedAttributes: [
@@ -21,6 +24,7 @@ const cartItemSchema = new mongoose.Schema(
       },
     ],
     itemTotal: { type: Number, required: true },
+    itemTax: { type: Number, default: 0 }, 
   },
   { _id: true }
 );
@@ -40,7 +44,8 @@ const cartSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
-cartSchema.pre("save", function (next) {
+// ✅ Calculate per-item tax + totals
+cartSchema.pre("save", async function (next) {
   this.itemsCount = this.items.reduce((sum, item) => sum + item.quantity, 0);
   this.subtotal = this.items.reduce((sum, item) => sum + item.itemTotal, 0);
 
@@ -51,16 +56,32 @@ cartSchema.pre("save", function (next) {
     return sum + (originalTotal - sellingTotal);
   }, 0);
 
-  this.tax = this.subtotal * 0.18;
+  // Reset totals
+  this.tax = 0;
+
+  // Fetch tax rates per item if needed
+  for (let item of this.items) {
+    let taxRate = item.product.taxRate || 0;
+
+    if (item.product.taxRecordId && !item.product.taxRate) {
+      const tax = await Tax.findOne({
+        recordId: item.product.taxRecordId,
+        status: true,
+      });
+      if (tax && tax.rate) {
+        taxRate = parseFloat(tax.rate);
+        item.product.taxRate = taxRate; // store for future
+      }
+    }
+
+    const basePrice = item.product.discountPrice || item.product.price;
+    item.itemTotal = basePrice * item.quantity;
+    item.itemTax = ((item.itemTotal * taxRate) / 100);
+    this.tax += item.itemTax;
+  }
 
   this.total = this.subtotal + this.tax;
   this.updatedAt = new Date();
-  next();
-});
-
-cartItemSchema.pre("save", function (next) {
-  const sellingPrice = this.product.discountPrice || this.product.price;
-  this.itemTotal = sellingPrice * this.quantity;
   next();
 });
 
