@@ -1,6 +1,7 @@
 import Category from "../models/category.model.js";
 import { generateRecordId } from "../utils/recordId.js";
 import { errorResponse, successResponse } from "../utils/response.js";
+import { uploadImage } from "../utils/uploadImage.js";
 
 export const addCategory = async (req, res) => {
   try {
@@ -23,7 +24,6 @@ export const addCategory = async (req, res) => {
     }
 
     let parentData = null;
-
     if (parentCategory?.recordId) {
       const parent = await Category.findOne({
         recordId: parentCategory.recordId,
@@ -41,17 +41,24 @@ export const addCategory = async (req, res) => {
       };
     }
 
+    const uploadedImage = image
+      ? image.startsWith("http")
+        ? image
+        : await uploadImage(image)
+      : null;
+
     const newCategory = await Category.create({
       recordId: generateRecordId(),
       identifier,
       name,
       shortDescription,
-      image,
+      image: uploadedImage,
       displayPriority: displayPriority || 0,
       parentCategory: parentData,
       status: true,
       creationTime: Date.now(),
       lastModified: Date.now(),
+      createdBy: req.user?.email || "system",
     });
 
     return successResponse(res, "Category created successfully", newCategory);
@@ -71,22 +78,20 @@ export const editCategory = async (req, res) => {
       image,
       status,
       displayPriority,
-      parentCategory, // can be object, null, or undefined
+      parentCategory,
     } = req.body;
 
     if (!recordId) {
       return errorResponse(res, "recordId is required to edit category", 400);
     }
 
-    // Find the category by recordId
     const category = await Category.findOne({ recordId });
     if (!category) {
       return errorResponse(res, "Category not found", 404);
     }
 
-    // Handle parentCategory properly
     if (parentCategory === null) {
-      category.parentCategory = null; // ✅ clear existing parent
+      category.parentCategory = null;
     } else if (parentCategory?.recordId) {
       const parent = await Category.findOne({
         recordId: parentCategory.recordId,
@@ -103,16 +108,23 @@ export const editCategory = async (req, res) => {
         image: parent.image,
       };
     }
-    // if parentCategory is undefined → don’t touch existing
 
-    // Update other fields
-    category.identifier = identifier ?? category.identifier;
-    category.name = name ?? category.name;
-    category.shortDescription = shortDescription ?? category.shortDescription;
-    category.image = image ?? category.image;
-    category.status = status ?? category.status;
-    category.displayPriority = displayPriority ?? category.displayPriority;
+    if (typeof image === "string") {
+      category.image = image.startsWith("http")
+        ? image
+        : await uploadImage(image);
+    }
+
+    if (identifier !== undefined) category.identifier = identifier;
+    if (name !== undefined) category.name = name;
+    if (shortDescription !== undefined)
+      category.shortDescription = shortDescription;
+    if (status !== undefined) category.status = status;
+    if (displayPriority !== undefined)
+      category.displayPriority = displayPriority;
+
     category.lastModified = Date.now();
+    category.modifiedBy = req.user?.email || "system";
 
     await category.save();
 
