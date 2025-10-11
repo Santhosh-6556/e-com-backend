@@ -10,7 +10,7 @@ import { authMiddleware } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-router.post("/cart", authMiddleware(["user", "admin"]), getCart);
+router.post("/cart/get", authMiddleware(["user", "admin"]), getCart);
 router.post("/cart/add", authMiddleware(["user", "admin"]), addToCart);
 router.post("/cart/update", authMiddleware(["user", "admin"]), updateCartItem);
 router.post("/cart/remove", authMiddleware(["user", "admin"]), removeFromCart);

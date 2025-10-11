@@ -1,62 +1,88 @@
+import mongoose from "mongoose";
 import Cart from "../models/cart.model.js";
 import Product from "../models/addproduct.model.js";
 import { generateRecordId } from "../utils/recordId.js";
 import { successResponse, errorResponse } from "../utils/response.js";
 
+const formatCartResponse = async (cart) => {
+  const items = await Promise.all(
+    cart.items.map(async (item) => {
+      const product = await Product.findOne({ recordId: item.productId });
+      if (!product) return null;
+
+      const quantity = item.quantity;
+      const originalPrice = product.price * quantity;
+      const discountPrice = (product.discountPrice || product.price) * quantity;
+      const discount = originalPrice - discountPrice;
+
+      let taxRate = 0;
+      if (product.tax?.recordId) {
+        const taxDoc = await mongoose.model("Tax").findOne({
+          recordId: product.tax.recordId,
+          status: true,
+        });
+        if (taxDoc && taxDoc.rate) taxRate = parseFloat(taxDoc.rate);
+      }
+
+      const itemTax = (discountPrice * taxRate) / 100;
+      const subtotal = discountPrice;
+      const total = subtotal + itemTax;
+
+      return {
+        id: item._id,
+        productId: product.recordId,
+        name: product.identifier,
+        slug: product.slug,
+        quantity,
+        images: product.images,
+        originalPrice,
+        discountPrice,
+        discount,
+        tax: itemTax,
+        subtotal,
+        total,
+      };
+    })
+  );
+
+  const validItems = items.filter(Boolean);
+
+  const summary = {
+    itemsCount: validItems.reduce((sum, i) => sum + i.quantity, 0),
+    originalPrice: validItems.reduce((sum, i) => sum + i.originalPrice, 0),
+    discountPrice: validItems.reduce((sum, i) => sum + i.discountPrice, 0),
+    discount: validItems.reduce((sum, i) => sum + i.discount, 0),
+    tax: validItems.reduce((sum, i) => sum + i.tax, 0),
+    subtotal: validItems.reduce((sum, i) => sum + i.subtotal, 0),
+    total: validItems.reduce((sum, i) => sum + i.total, 0),
+  };
+
+  return {
+    cartId: cart.recordId,
+    userId: cart.userId,
+    items: validItems,
+    summary,
+  };
+};
+
 export const getCart = async (req, res) => {
   try {
     const { userId } = req.body;
-
-    if (!userId) {
-      return errorResponse(res, "User ID is required", 400);
-    }
+    if (!userId) return errorResponse(res, "User ID is required", 400);
 
     let cart = await Cart.findOne({ userId });
-
     if (!cart) {
       cart = await Cart.create({
         recordId: generateRecordId(),
-        userId: userId,
+        userId,
         items: [],
-        itemsCount: 0,
-        subtotal: 0,
-        discount: 0,
-        tax: 0,
-        total: 0,
       });
     }
 
-    const response = {
-      cartId: cart.recordId,
-      items: cart.items.map((item) => ({
-        id: item._id,
-        product: {
-          recordId: item.product.recordId,
-          name: item.product.name,
-          identifier: item.product.identifier,
-          slug: item.product.slug,
-          price: item.product.price,
-          discountPrice: item.product.discountPrice,
-          images: item.product.images,
-          stock: item.product.stock,
-          status: item.product.status,
-        },
-        quantity: item.quantity,
-        selectedAttributes: item.selectedAttributes,
-        itemTotal: item.itemTotal,
-      })),
-      summary: {
-        itemsCount: cart.itemsCount,
-        subtotal: cart.subtotal,
-        discount: cart.discount,
-        tax: cart.tax,
-        total: cart.total,
-      },
-    };
-
+    const response = await formatCartResponse(cart);
     return successResponse(res, "Cart retrieved successfully", response);
-  } catch (error) {
-    console.error("GetCart Error:", error);
+  } catch (err) {
+    console.error("GetCart Error:", err);
     return errorResponse(res, "Failed to retrieve cart", 500);
   }
 };
@@ -64,121 +90,36 @@ export const getCart = async (req, res) => {
 export const addToCart = async (req, res) => {
   try {
     const { userId, productRecordId, quantity = 1 } = req.body;
-
-    if (!userId) {
-      return errorResponse(res, "User ID is required", 400);
-    }
-
-    if (!productRecordId) {
-      return errorResponse(res, "Product record ID is required", 400);
-    }
+    if (!userId || !productRecordId)
+      return errorResponse(res, "User ID and product ID are required", 400);
 
     const product = await Product.findOne({
       recordId: productRecordId,
       status: true,
-      stock: { $gt: 0 },
     });
-
-    if (!product) {
-      return errorResponse(res, "Product not found or out of stock", 404);
-    }
-
-    const itemQuantity = Math.max(1, parseInt(quantity) || 1);
-
-    if (product.stock < itemQuantity) {
-      return errorResponse(
-        res,
-        `Only ${product.stock} items available in stock`,
-        400
-      );
-    }
+    if (!product)
+      return errorResponse(res, "Product not found or inactive", 404);
 
     let cart = await Cart.findOne({ userId });
-
     if (!cart) {
-      cart = await Cart.create({
-        recordId: generateRecordId(),
-        userId: userId,
-        items: [],
-      });
+      cart = new Cart({ recordId: generateRecordId(), userId, items: [] });
     }
 
-    const existingItemIndex = cart.items.findIndex(
-      (item) => item.product.recordId === productRecordId
+    const existingItem = cart.items.find(
+      (i) => i.productId === productRecordId
     );
-
-    const sellingPrice = product.discountPrice || product.price;
-    const itemTotal = sellingPrice * itemQuantity;
-
-    if (existingItemIndex > -1) {
-      const newQuantity = cart.items[existingItemIndex].quantity + itemQuantity;
-
-      if (product.stock < newQuantity) {
-        return errorResponse(
-          res,
-          `Cannot add more than ${product.stock} items`,
-          400
-        );
-      }
-
-      cart.items[existingItemIndex].quantity = newQuantity;
-      cart.items[existingItemIndex].itemTotal = sellingPrice * newQuantity;
+    if (existingItem) {
+      existingItem.quantity += quantity;
     } else {
-      const cartProduct = {
-        recordId: product.recordId,
-        name: product.name,
-        identifier: product.identifier,
-        slug: product.slug,
-        price: product.price,
-        discountPrice: product.discountPrice,
-        images: product.images,
-        stock: product.stock,
-        status: product.status,
-        taxRecordId: product.tax?.recordId || null,
-      };
-
-      cart.items.push({
-        product: cartProduct,
-        quantity: itemQuantity,
-        selectedAttributes: [],
-        itemTotal: itemTotal,
-      });
+      cart.items.push({ productId: productRecordId, quantity });
     }
 
     await cart.save();
 
-    const updatedCart = await Cart.findOne({ userId });
-    const response = {
-      cartId: updatedCart.recordId,
-      items: updatedCart.items.map((item) => ({
-        id: item._id,
-        product: {
-          recordId: item.product.recordId,
-          name: item.product.name,
-          identifier: item.product.identifier,
-          slug: item.product.slug,
-          price: item.product.price,
-          discountPrice: item.product.discountPrice,
-          images: item.product.images,
-          stock: item.product.stock,
-          status: item.product.status,
-        },
-        quantity: item.quantity,
-        selectedAttributes: item.selectedAttributes,
-        itemTotal: item.itemTotal,
-      })),
-      summary: {
-        itemsCount: updatedCart.itemsCount,
-        subtotal: updatedCart.subtotal,
-        discount: updatedCart.discount,
-        tax: updatedCart.tax,
-        total: updatedCart.total,
-      },
-    };
-
+    const response = await formatCartResponse(cart);
     return successResponse(res, "Item added to cart successfully", response);
-  } catch (error) {
-    console.error("AddToCart Error:", error);
+  } catch (err) {
+    console.error("AddToCart Error:", err);
     return errorResponse(res, "Failed to add item to cart", 500);
   }
 };
@@ -186,94 +127,26 @@ export const addToCart = async (req, res) => {
 export const updateCartItem = async (req, res) => {
   try {
     const { userId, productRecordId, quantity } = req.body;
-
-    if (!userId) {
-      return errorResponse(res, "User ID is required", 400);
-    }
-
-    if (!productRecordId || quantity === undefined) {
+    if (!userId || !productRecordId || quantity === undefined)
       return errorResponse(
         res,
-        "Product record ID and quantity are required",
+        "User ID, product ID and quantity are required",
         400
       );
-    }
-
-    const itemQuantity = parseInt(quantity);
-
-    if (itemQuantity < 1) {
-      return errorResponse(res, "Quantity must be at least 1", 400);
-    }
 
     const cart = await Cart.findOne({ userId });
+    if (!cart) return errorResponse(res, "Cart not found", 404);
 
-    if (!cart) {
-      return errorResponse(res, "Cart not found", 404);
-    }
+    const item = cart.items.find((i) => i.productId === productRecordId);
+    if (!item) return errorResponse(res, "Item not found in cart", 404);
 
-    const itemIndex = cart.items.findIndex(
-      (item) => item.product.recordId === productRecordId
-    );
-
-    if (itemIndex === -1) {
-      return errorResponse(res, "Item not found in cart", 404);
-    }
-
-    const product = await Product.findOne({
-      recordId: productRecordId,
-      status: true,
-    });
-
-    if (!product) {
-      return errorResponse(res, "Product no longer available", 404);
-    }
-
-    if (product.stock < itemQuantity) {
-      return errorResponse(
-        res,
-        `Only ${product.stock} items available in stock`,
-        400
-      );
-    }
-
-    const sellingPrice = product.discountPrice || product.price;
-    cart.items[itemIndex].quantity = itemQuantity;
-    cart.items[itemIndex].itemTotal = sellingPrice * itemQuantity;
-
+    item.quantity = quantity;
     await cart.save();
 
-    const updatedCart = await Cart.findOne({ userId });
-    const response = {
-      cartId: updatedCart.recordId,
-      items: updatedCart.items.map((item) => ({
-        id: item._id,
-        product: {
-          recordId: item.product.recordId,
-          name: item.product.name,
-          identifier: item.product.identifier,
-          slug: item.product.slug,
-          price: item.product.price,
-          discountPrice: item.product.discountPrice,
-          images: item.product.images,
-          stock: item.product.stock,
-          status: item.product.status,
-        },
-        quantity: item.quantity,
-        selectedAttributes: item.selectedAttributes,
-        itemTotal: item.itemTotal,
-      })),
-      summary: {
-        itemsCount: updatedCart.itemsCount,
-        subtotal: updatedCart.subtotal,
-        discount: updatedCart.discount,
-        tax: updatedCart.tax,
-        total: updatedCart.total,
-      },
-    };
-
+    const response = await formatCartResponse(cart);
     return successResponse(res, "Cart item updated successfully", response);
-  } catch (error) {
-    console.error("UpdateCartItem Error:", error);
+  } catch (err) {
+    console.error("UpdateCartItem Error:", err);
     return errorResponse(res, "Failed to update cart item", 500);
   }
 };
@@ -281,68 +154,23 @@ export const updateCartItem = async (req, res) => {
 export const removeFromCart = async (req, res) => {
   try {
     const { userId, productRecordId } = req.body;
-
-    if (!userId) {
-      return errorResponse(res, "User ID is required", 400);
-    }
-
-    if (!productRecordId) {
-      return errorResponse(res, "Product record ID is required", 400);
-    }
+    if (!userId || !productRecordId)
+      return errorResponse(res, "User ID and product ID are required", 400);
 
     const cart = await Cart.findOne({ userId });
+    if (!cart) return errorResponse(res, "Cart not found", 404);
 
-    if (!cart) {
-      return errorResponse(res, "Cart not found", 404);
-    }
-
-    const initialLength = cart.items.length;
-    cart.items = cart.items.filter(
-      (item) => item.product.recordId !== productRecordId
-    );
-
-    if (cart.items.length === initialLength) {
-      return errorResponse(res, "Item not found in cart", 404);
-    }
-
+    cart.items = cart.items.filter((i) => i.productId !== productRecordId);
     await cart.save();
 
-    const updatedCart = await Cart.findOne({ userId });
-    const response = {
-      cartId: updatedCart.recordId,
-      items: updatedCart.items.map((item) => ({
-        id: item._id,
-        product: {
-          recordId: item.product.recordId,
-          name: item.product.name,
-          identifier: item.product.identifier,
-          slug: item.product.slug,
-          price: item.product.price,
-          discountPrice: item.product.discountPrice,
-          images: item.product.images,
-          stock: item.product.stock,
-          status: item.product.status,
-        },
-        quantity: item.quantity,
-        selectedAttributes: item.selectedAttributes,
-        itemTotal: item.itemTotal,
-      })),
-      summary: {
-        itemsCount: updatedCart.itemsCount,
-        subtotal: updatedCart.subtotal,
-        discount: updatedCart.discount,
-        tax: updatedCart.tax,
-        total: updatedCart.total,
-      },
-    };
-
+    const response = await formatCartResponse(cart);
     return successResponse(
       res,
       "Item removed from cart successfully",
       response
     );
-  } catch (error) {
-    console.error("RemoveFromCart Error:", error);
+  } catch (err) {
+    console.error("RemoveFromCart Error:", err);
     return errorResponse(res, "Failed to remove item from cart", 500);
   }
 };
@@ -350,16 +178,10 @@ export const removeFromCart = async (req, res) => {
 export const clearCart = async (req, res) => {
   try {
     const { userId } = req.body;
-
-    if (!userId) {
-      return errorResponse(res, "User ID is required", 400);
-    }
+    if (!userId) return errorResponse(res, "User ID is required", 400);
 
     const cart = await Cart.findOne({ userId });
-
-    if (!cart) {
-      return errorResponse(res, "Cart not found", 404);
-    }
+    if (!cart) return errorResponse(res, "Cart not found", 404);
 
     cart.items = [];
     await cart.save();
@@ -369,16 +191,18 @@ export const clearCart = async (req, res) => {
       items: [],
       summary: {
         itemsCount: 0,
-        subtotal: 0,
+        originalPrice: 0,
+        discountPrice: 0,
         discount: 0,
         tax: 0,
+        subtotal: 0,
         total: 0,
       },
     };
 
     return successResponse(res, "Cart cleared successfully", response);
-  } catch (error) {
-    console.error("ClearCart Error:", error);
+  } catch (err) {
+    console.error("ClearCart Error:", err);
     return errorResponse(res, "Failed to clear cart", 500);
   }
 };

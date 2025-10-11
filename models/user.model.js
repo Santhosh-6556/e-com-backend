@@ -2,11 +2,17 @@ import mongoose from "mongoose";
 
 const addressSchema = new mongoose.Schema(
   {
-    street: String,
+    recordId:String,
+    firstName: String,
+    lastname: String,
+    phone: String,
+    email: String,
+    line1: String,
+    line2: String,
     city: String,
     state: String,
     country: String,
-    postalCode: String,
+    isDefaultDelivery:Boolean
   },
   { _id: false }
 );
@@ -16,7 +22,7 @@ const userSchema = new mongoose.Schema(
     recordId: {
       type: String,
       required: true,
-      unique: true
+      unique: true,
     },
     name: {
       type: String,

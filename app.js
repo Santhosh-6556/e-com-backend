@@ -12,6 +12,7 @@ import banner from "./routes/banner.routes.js";
 import tax from "./routes/tax.routes.js";
 import publicRoutes from "./routes/public.routes.js";
 import cart from "./routes/cart.routes.js";
+import user from "./routes/user.routes.js";
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use("/admin", banner);
 app.use("/admin", tax);
 app.use("/api", publicRoutes);
 app.use("/admin", cart);
+app.use("/admin", user);
 
 app.get("/ping", (req, res) => {
   res.send("pong");
