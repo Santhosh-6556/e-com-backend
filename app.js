@@ -13,6 +13,7 @@ import tax from "./routes/tax.routes.js";
 import publicRoutes from "./routes/public.routes.js";
 import cart from "./routes/cart.routes.js";
 import user from "./routes/user.routes.js";
+import faq from "./routes/faq.routes.js";
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use("/admin", brandRoutes);
 app.use("/admin", wishlist);
 app.use("/admin", banner);
 app.use("/admin", tax);
+app.use("/admin", faq);
 app.use("/api", publicRoutes);
 app.use("/admin", cart);
 app.use("/admin", user);
