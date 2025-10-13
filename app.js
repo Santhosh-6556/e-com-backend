@@ -14,6 +14,7 @@ import publicRoutes from "./routes/public.routes.js";
 import cart from "./routes/cart.routes.js";
 import user from "./routes/user.routes.js";
 import faq from "./routes/faq.routes.js";
+import order from "./routes/order.routes.js";
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use("/admin", faq);
 app.use("/api", publicRoutes);
 app.use("/admin", cart);
 app.use("/admin", user);
+app.use("/admin", order);
 
 app.get("/ping", (req, res) => {
   res.send("pong");

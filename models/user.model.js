@@ -2,9 +2,9 @@ import mongoose from "mongoose";
 
 const addressSchema = new mongoose.Schema(
   {
-    recordId:String,
+    recordId: String,
     firstName: String,
-    lastname: String,
+    lastName: String,
     phone: String,
     email: String,
     line1: String,
@@ -12,7 +12,8 @@ const addressSchema = new mongoose.Schema(
     city: String,
     state: String,
     country: String,
-    isDefaultDelivery:Boolean
+    pinCode:String,
+    isDefaultDelivery: Boolean
   },
   { _id: false }
 );

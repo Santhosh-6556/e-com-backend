@@ -15,6 +15,7 @@ export const addAddress = async (req, res) => {
       city,
       state,
       country,
+      pinCode,
       isDefaultDelivery,
     } = req.body;
 
@@ -25,7 +26,8 @@ export const addAddress = async (req, res) => {
       !line1 ||
       !city ||
       !state ||
-      !country
+      !country ||
+      !pinCode
     ) {
       return errorResponse(res, "All required fields must be filled", 400);
     }
@@ -48,6 +50,7 @@ export const addAddress = async (req, res) => {
       city,
       state,
       country,
+      pinCode,
       isDefaultDelivery: !!isDefaultDelivery,
     };
 
