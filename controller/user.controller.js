@@ -2,6 +2,50 @@ import User from "../models/user.model.js";
 import { generateRecordId } from "../utils/recordId.js";
 import { successResponse, errorResponse } from "../utils/response.js";
 
+export const getUserProfile = async (req, res) => {
+  try {
+    const userId = req.user.recordId; // from auth middleware
+
+    const user = await User.findOne({ recordId: userId });
+    if (!user) return errorResponse(res, "User not found", 404);
+
+    // Return the full user document
+    return successResponse(res, "User retrieved successfully", user);
+  } catch (err) {
+    console.error("GetUserProfile Error:", err);
+    return errorResponse(res, "Failed to get user profile", 500);
+  }
+};
+
+export const updateUserProfile = async (req, res) => {
+  try {
+    // const userId = req.user.recordId;
+    const { name, email, phone, dob, recordId } = req.body;
+
+    const user = await User.findOne({ recordId: recordId });
+    if (!user) return errorResponse(res, "User not found", 404);
+
+    // Update only the provided fields
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (phone) user.phone = phone;
+    if (dob) user.dob = dob;
+
+    await user.save();
+
+    return successResponse(res, "Profile updated successfully", {
+      recordId: user.recordId,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      dob: user.dob,
+    });
+  } catch (err) {
+    console.error("UpdateUserProfile Error:", err);
+    return errorResponse(res, "Failed to update profile", 500);
+  }
+};
+
 export const addAddress = async (req, res) => {
   try {
     const userId = req.user.recordId;
@@ -10,6 +54,8 @@ export const addAddress = async (req, res) => {
       lastName,
       phone,
       email,
+      pincode,
+      addressType,
       line1,
       line2,
       city,
@@ -22,6 +68,8 @@ export const addAddress = async (req, res) => {
       !firstName ||
       !lastName ||
       !phone ||
+      !pincode ||
+      !addressType ||
       !line1 ||
       !city ||
       !state ||
@@ -43,6 +91,8 @@ export const addAddress = async (req, res) => {
       lastName,
       phone,
       email,
+      pincode,
+      addressType,
       line1,
       line2,
       city,
@@ -87,6 +137,8 @@ export const updateAddress = async (req, res) => {
       lastName,
       phone,
       email,
+      pincode,
+      addressType,
       line1,
       line2,
       city,
@@ -106,9 +158,11 @@ export const updateAddress = async (req, res) => {
     if (!address) return errorResponse(res, "Address not found", 404);
 
     if (firstName) address.firstName = firstName;
-    if (lastName) address.lastname = lastName;
+    if (lastName) address.lastName = lastName;
     if (phone) address.phone = phone;
     if (email) address.email = email;
+    if (addressType) address.addressType = addressType;
+    if (pincode) address.pincode = pincode;
     if (line1) address.line1 = line1;
     if (line2) address.line2 = line2;
     if (city) address.city = city;
