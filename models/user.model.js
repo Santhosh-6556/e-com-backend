@@ -3,7 +3,9 @@ import mongoose from "mongoose";
 const addressSchema = new mongoose.Schema(
   {
     recordId: String,
+    recordId: String,
     firstName: String,
+    lastName: String,
     lastName: String,
     phone: String,
     email: String,
