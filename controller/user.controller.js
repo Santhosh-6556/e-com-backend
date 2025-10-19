@@ -54,7 +54,6 @@ export const addAddress = async (req, res) => {
       lastName,
       phone,
       email,
-      pincode,
       addressType,
       line1,
       line2,
@@ -69,7 +68,6 @@ export const addAddress = async (req, res) => {
       !firstName ||
       !lastName ||
       !phone ||
-      !pincode ||
       !addressType ||
       !line1 ||
       !city ||
@@ -93,7 +91,6 @@ export const addAddress = async (req, res) => {
       lastName,
       phone,
       email,
-      pincode,
       addressType,
       line1,
       line2,
@@ -140,7 +137,7 @@ export const updateAddress = async (req, res) => {
       lastName,
       phone,
       email,
-      pincode,
+      pinCode,
       addressType,
       line1,
       line2,
@@ -165,7 +162,7 @@ export const updateAddress = async (req, res) => {
     if (phone) address.phone = phone;
     if (email) address.email = email;
     if (addressType) address.addressType = addressType;
-    if (pincode) address.pincode = pincode;
+    if (pinCode) address.pinCode = pinCode;
     if (line1) address.line1 = line1;
     if (line2) address.line2 = line2;
     if (city) address.city = city;
