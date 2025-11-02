@@ -302,12 +302,12 @@ export const verifyPayment = async (req, res) => {
 // Get User Orders
 export const getUserOrders = async (req, res) => {
   try {
-    const { userId } = req.body;
-    if (!userId) {
+    const { recordId } = req.body;
+    if (!recordId) {
       return errorResponse(res, "User ID is required", 400);
     }
 
-    const orders = await Order.find({ userId })
+    const orders = await Order.find({ recordId })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -343,6 +343,7 @@ export const getOrderDetails = async (req, res) => {
     return errorResponse(res, "Failed to retrieve order details", 500);
   }
 };
+
 
 // Cancel Order
 export const cancelOrder = async (req, res) => {
@@ -393,5 +394,34 @@ export const cancelOrder = async (req, res) => {
     return errorResponse(res, "Failed to cancel order", 500);
   } finally {
     session.endSession();
+  }
+};
+
+
+export const getAllOrders = async (req, res) => {
+  try {
+    // Fetch all orders
+    const orders = await Order.find().sort({ creationTime: -1 });
+
+    // Collect all user recordIds from orders
+    const userRecordIds = orders.map((order) => order.userId);
+
+    // Fetch corresponding users
+    const users = await User.find({ recordId: { $in: userRecordIds } })
+      .select("recordId name email phone addresses");
+
+    // Merge user details into each order
+    const mergedOrders = orders.map((order) => {
+      const user = users.find((u) => u.recordId === order.userId);
+      return {
+        ...order.toObject(),
+        userDetails: user || null,
+      };
+    });
+
+    return successResponse(res, "Orders fetched successfully", mergedOrders);
+  } catch (err) {
+    console.error("Get Order Error:", err);
+    return errorResponse(res, "Failed to fetch orders", 500);
   }
 };

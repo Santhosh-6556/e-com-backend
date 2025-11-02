@@ -14,7 +14,7 @@ const router = express.Router();
 router.get("/user/get", authMiddleware(["user", "admin"]), getUserProfile);
 router.post("/user/address/add", authMiddleware(["user", "admin"]), addAddress);
 router.post(
-  "/user/upadte",
+  "/user/update",
   authMiddleware(["user", "admin"]),
   updateUserProfile
 );
