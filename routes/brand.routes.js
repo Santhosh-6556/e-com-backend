@@ -1,4 +1,4 @@
-import express from "express";
+import { Hono } from "hono";
 import {
   addBrand,
   editBrand,
@@ -8,15 +8,28 @@ import {
   Brands,
 } from "../controller/brand.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
+import { expressToHono } from "../utils/hono-adapter.js";
 
-const router = express.Router();
+const router = new Hono();
 
 // CRUD APIs for Brand/Brand
-router.post("/brand/add", authMiddleware(["admin"]), addBrand);
-router.post("/brand/edit", authMiddleware(["admin"]), editBrand);
-router.post("/brand/delete", authMiddleware(["admin"]), deleteBrand);
-router.get("/brand/get", authMiddleware(["admin", "user"]), getAllBrand);
-router.get("/brand", authMiddleware(["admin", "user"]), Brands);
-router.post("/brand/getedit", authMiddleware(["admin", "user"]), getBrandByRecordId);
+router.post("/brand/add", authMiddleware(["admin"]), expressToHono(addBrand));
+router.post("/brand/edit", authMiddleware(["admin"]), expressToHono(editBrand));
+router.post(
+  "/brand/delete",
+  authMiddleware(["admin"]),
+  expressToHono(deleteBrand)
+);
+router.get(
+  "/brand/get",
+  authMiddleware(["admin", "user"]),
+  expressToHono(getAllBrand)
+);
+router.get("/brand", authMiddleware(["admin", "user"]), expressToHono(Brands));
+router.post(
+  "/brand/getedit",
+  authMiddleware(["admin", "user"]),
+  expressToHono(getBrandByRecordId)
+);
 
 export default router;

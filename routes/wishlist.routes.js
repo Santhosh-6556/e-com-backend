@@ -1,5 +1,4 @@
-import express from "express";
-
+import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 import {
   addToWishlist,
@@ -10,17 +9,18 @@ import {
   getWishlistProducts,
   removeFromWishlist,
 } from "../controller/wishlist.controller.js";
+import { expressToHono } from "../utils/hono-adapter.js";
 
-const router = express.Router();
+const router = new Hono();
 
-router.use(authMiddleware(["user", "admin"]));
+router.use("*", authMiddleware(["user", "admin"]));
 
-router.post("/wishlist/add", addToWishlist);
-router.post("/wishlist/remove", removeFromWishlist);
-router.post("/wishlist", getWishlist);
-router.post("/wishlist/products", getWishlistProducts);
-router.post("/wishlist/clear", clearWishlist);
-router.post("/wishlist/count", getWishlistCount);
-router.post("/wishlist/check", checkProductInWishlist);
+router.post("/wishlist/add", expressToHono(addToWishlist));
+router.post("/wishlist/remove", expressToHono(removeFromWishlist));
+router.post("/wishlist", expressToHono(getWishlist));
+router.post("/wishlist/products", expressToHono(getWishlistProducts));
+router.post("/wishlist/clear", expressToHono(clearWishlist));
+router.post("/wishlist/count", expressToHono(getWishlistCount));
+router.post("/wishlist/check", expressToHono(checkProductInWishlist));
 
 export default router;
