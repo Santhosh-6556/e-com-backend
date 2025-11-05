@@ -4,7 +4,7 @@ import app from "./app.js";
 import { Server } from "socket.io"; // socket.io
 import connectDB from "./config/db.js";
 import { messages } from "./routes/auth.routes.js";
-import { createServer } from "http";
+import { createServer } from "node:http";
 
 dotenv.config();
 

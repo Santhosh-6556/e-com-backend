@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { existsSync } from "fs";
-import path from "path";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import authRoutes from "./routes/auth.routes.js";
 import nodeRoutes from "./routes/node.routes.js";
 import productRoutes from "./routes/product.router.js";
