@@ -36,8 +36,14 @@ wishlistSchema.pre("save", function (next) {
 });
 
 // Index for better performance
-wishlistSchema.index({ userRecordId: 1 });
-wishlistSchema.index({ "items.productRecordId": 1 });
+// Wrap in try-catch for Workers compatibility (Mongoose emits warnings via process.emitWarning)
+try {
+  wishlistSchema.index({ userRecordId: 1 });
+  wishlistSchema.index({ "items.productRecordId": 1 });
+} catch (error) {
+  // Silently ignore index errors in Workers (Mongoose is incompatible with Workers anyway)
+  // MongoDB connections will fail regardless due to TCP requirement
+}
 
 const Wishlist = mongoose.model("Wishlist", wishlistSchema);
 
