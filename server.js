@@ -1,17 +1,37 @@
 // server.js (ESM version)
 import dotenv from "dotenv";
 import app from "./app.js";
-import http from "http";
 import { Server } from "socket.io"; // socket.io
 import connectDB from "./config/db.js";
 import { messages } from "./routes/auth.routes.js";
+import { createServer } from "http";
 
 dotenv.config();
 
 // Connect DB
 connectDB();
 
-const server = http.createServer(app);
+const server = createServer(async (req, res) => {
+  try {
+    const response = await app.fetch(req);
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+    res.statusCode = response.status;
+
+    // Handle different response types
+    if (response.body) {
+      const buffer = await response.arrayBuffer();
+      res.end(Buffer.from(buffer));
+    } else {
+      res.end();
+    }
+  } catch (error) {
+    console.error("Server error:", error);
+    res.statusCode = 500;
+    res.end("Internal Server Error");
+  }
+});
 
 const io = new Server(server, {
   cors: {

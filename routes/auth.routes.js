@@ -1,4 +1,4 @@
-import express from "express";
+import { Hono } from "hono";
 import {
   login,
   verifyOTP,
@@ -7,7 +7,7 @@ import {
 } from "../controller/auth.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 
-const router = express.Router();
+const router = new Hono();
 
 router.post("/login", login);
 
@@ -17,24 +17,24 @@ router.post("/verify-otp", verifyOTP);
 
 router.post("/admin-login", adminLogin);
 
-router.get("/demo", authMiddleware(["admin"]), (req, res) => {
-  res.send("SBV Backend is running 🚀");
+router.get("/demo", authMiddleware(["admin"]), (c) => {
+  return c.text("SBV Backend is running 🚀");
 });
 
 const messages = [];
 
-router.get("/getmessage", (req, res) => {
-  res.json(messages);
+router.get("/getmessage", (c) => {
+  return c.json(messages);
 });
 
 // POST a new message (optional, for REST API)
-router.post("/sendmessage", (req, res) => {
-  const { text, id } = req.body;
-  if (!text) return res.status(400).json({ error: "Message text is required" });
+router.post("/sendmessage", async (c) => {
+  const { text, id } = await c.req.json();
+  if (!text) return c.json({ error: "Message text is required" }, 400);
 
   const message = { id: id || "anonymous", text, time: new Date() };
   messages.push(message);
-  res.status(201).json(message);
+  return c.json(message, 201);
 });
 
 export default router;

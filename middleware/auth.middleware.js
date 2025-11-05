@@ -2,31 +2,26 @@ import { verifyToken } from "../utils/jwt.js";
 import { errorResponse } from "../utils/response.js";
 
 export const authMiddleware = (allowedRoles = []) => {
-  return (req, res, next) => {
-    const authHeader = req.headers["authorization"];
+  return async (c, next) => {
+    const authHeader = c.req.header("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return errorResponse(res, "No token provided", 401);
+      return errorResponse(c, "No token provided", 401);
     }
 
     const token = authHeader.split(" ")[1];
     try {
       const decoded = verifyToken(token);
-      //   req.user = decoded;
 
       const userRole = decoded.role || "user";
-      req.user = { ...decoded, role: userRole };
+      c.set("user", { ...decoded, role: userRole });
 
       if (allowedRoles.length && !allowedRoles.includes(decoded.role)) {
-        return errorResponse(
-          res,
-          "Access denied: insufficient permissions",
-          403
-        );
+        return errorResponse(c, "Access denied: insufficient permissions", 403);
       }
 
-      next();
+      await next();
     } catch (err) {
-      return errorResponse(res, "Invalid or expired token", 403);
+      return errorResponse(c, "Invalid or expired token", 403);
     }
   };
 };

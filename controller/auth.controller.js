@@ -10,7 +10,6 @@ const ADMIN_CREDENTIALS = {
   password: "welcome12345",
 };
 
-
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
@@ -24,16 +23,16 @@ const canResendOTP = (user) => {
   return timeSinceLastOTP > OTP_COOLDOWN;
 };
 
-export const login = async (req, res) => {
+export const login = async (c) => {
   try {
-    const { email } = req.body;
+    const { email } = await c.req.json();
 
     if (!email) {
-      return errorResponse(res, "Email is required", 400);
+      return errorResponse(c, "Email is required", 400);
     }
 
     if (email === ADMIN_CREDENTIALS.email) {
-      return successResponse(res, "Admin login detected", {
+      return successResponse(c, "Admin login detected", {
         isAdmin: true,
         email: email,
       });
@@ -52,7 +51,7 @@ export const login = async (req, res) => {
 
     if (!canResendOTP(user)) {
       return errorResponse(
-        res,
+        c,
         "Please wait 30 seconds before requesting a new OTP",
         429
       );
@@ -72,10 +71,10 @@ export const login = async (req, res) => {
       console.log(`OTP sent to ${email}: ${otp}`);
     } catch (emailError) {
       console.error("Email sending failed:", emailError);
-      return errorResponse(res, "Failed to send OTP email", 500);
+      return errorResponse(c, "Failed to send OTP email", 500);
     }
 
-    return successResponse(res, "OTP sent successfully", {
+    return successResponse(c, "OTP sent successfully", {
       email: email,
       isAdmin: false,
       message: "OTP sent to your email",
@@ -83,22 +82,22 @@ export const login = async (req, res) => {
     });
   } catch (error) {
     console.error("Login Error:", error);
-    return errorResponse(res, "Something went wrong", 500);
+    return errorResponse(c, "Something went wrong", 500);
   }
 };
 
-export const resendOTP = async (req, res) => {
+export const resendOTP = async (c) => {
   try {
-    const { email } = req.body;
+    const { email } = await c.req.json();
 
     if (!email) {
-      return errorResponse(res, "Email is required", 400);
+      return errorResponse(c, "Email is required", 400);
     }
 
     const user = await User.findOne({ email });
 
     if (!user) {
-      return errorResponse(res, "User not found", 404);
+      return errorResponse(c, "User not found", 404);
     }
 
     if (!canResendOTP(user)) {
@@ -107,7 +106,7 @@ export const resendOTP = async (req, res) => {
       const remainingTime = Math.ceil((30 * 1000 - timeSinceLastOTP) / 1000);
 
       return errorResponse(
-        res,
+        c,
         `Please wait ${remainingTime} seconds before requesting a new OTP`,
         429
       );
@@ -127,37 +126,37 @@ export const resendOTP = async (req, res) => {
       console.log(`Resent OTP to ${email}: ${otp}`);
     } catch (emailError) {
       console.error("Email sending failed:", emailError);
-      return errorResponse(res, "Failed to send OTP email", 500);
+      return errorResponse(c, "Failed to send OTP email", 500);
     }
 
-    return successResponse(res, "OTP resent successfully", {
+    return successResponse(c, "OTP resent successfully", {
       email: email,
       message: "New OTP sent to your email",
       canResendAfter: 30,
     });
   } catch (error) {
     console.error("Resend OTP Error:", error);
-    return errorResponse(res, "Something went wrong", 500);
+    return errorResponse(c, "Something went wrong", 500);
   }
 };
 
-export const verifyOTP = async (req, res) => {
+export const verifyOTP = async (c) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp } = await c.req.json();
 
     if (!email || !otp) {
-      return errorResponse(res, "Email and OTP are required", 400);
+      return errorResponse(c, "Email and OTP are required", 400);
     }
 
     const user = await User.findOne({ email });
 
     if (!user) {
-      return errorResponse(res, "User not found", 404);
+      return errorResponse(c, "User not found", 404);
     }
 
     if (user.otpExpires && new Date() > user.otpExpires) {
       return errorResponse(
-        res,
+        c,
         "OTP has expired. Please request a new one.",
         400
       );
@@ -166,7 +165,7 @@ export const verifyOTP = async (req, res) => {
     const MAX_OTP_ATTEMPTS = 5;
     if (user.otpAttempts >= MAX_OTP_ATTEMPTS) {
       return errorResponse(
-        res,
+        c,
         "Too many invalid OTP attempts. Please request a new OTP.",
         429
       );
@@ -178,7 +177,7 @@ export const verifyOTP = async (req, res) => {
 
       const remainingAttempts = MAX_OTP_ATTEMPTS - user.otpAttempts;
       return errorResponse(
-        res,
+        c,
         `Invalid OTP. ${remainingAttempts} attempts remaining.`,
         400
       );
@@ -196,7 +195,7 @@ export const verifyOTP = async (req, res) => {
       recordId: user.recordId,
     });
 
-    return successResponse(res, "Login successful", {
+    return successResponse(c, "Login successful", {
       jwtToken: token,
       user: {
         recordId: user.recordId,
@@ -211,23 +210,23 @@ export const verifyOTP = async (req, res) => {
     });
   } catch (error) {
     console.error("Verify OTP Error:", error);
-    return errorResponse(res, "Something went wrong", 500);
+    return errorResponse(c, "Something went wrong", 500);
   }
 };
 
-export const adminLogin = async (req, res) => {
+export const adminLogin = async (c) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = await c.req.json();
 
     if (!email || !password) {
-      return errorResponse(res, "Email and password are required", 400);
+      return errorResponse(c, "Email and password are required", 400);
     }
 
     if (
       email !== ADMIN_CREDENTIALS.email ||
       password !== ADMIN_CREDENTIALS.password
     ) {
-      return errorResponse(res, "Invalid admin credentials", 401);
+      return errorResponse(c, "Invalid admin credentials", 401);
     }
 
     let adminUser = await User.findOne({ email: ADMIN_CREDENTIALS.email });
@@ -249,7 +248,7 @@ export const adminLogin = async (req, res) => {
       recordId: adminUser.recordId,
     });
 
-    return successResponse(res, "Admin login successful", {
+    return successResponse(c, "Admin login successful", {
       jwtToken: token,
       user: {
         recordId: adminUser.recordId,
@@ -262,6 +261,6 @@ export const adminLogin = async (req, res) => {
     });
   } catch (error) {
     console.error("Admin Login Error:", error);
-    return errorResponse(res, "Something went wrong", 500);
+    return errorResponse(c, "Something went wrong", 500);
   }
 };
