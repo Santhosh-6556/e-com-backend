@@ -181,12 +181,10 @@ export const getAllBanners = async (req, res) => {
 
     const query = {};
 
-    // Only filter by status if includeInactive is false
     if (includeInactive === "false") {
       query.status = true;
     }
 
-    // Only filter by dates if includeExpired is false
     if (includeExpired === "false") {
       query.$or = [
         { endDate: { $exists: false } },

@@ -1,4 +1,3 @@
-// Import polyfills first before any other imports
 import "./polyfills.js";
 
 import { Hono } from "hono";
@@ -38,21 +37,27 @@ app.use(
   })
 );
 
-// Only serve static files if uploads directory exists
 try {
-  const uploadsPath = path.join(process.cwd(), "uploads");
-  if (existsSync(uploadsPath)) {
-    app.use(
-      "/uploads/*",
-      serveStatic({
-        root: uploadsPath,
-      })
-    );
+  if (
+    typeof process !== "undefined" &&
+    process.cwd &&
+    typeof process.cwd === "function"
+  ) {
+    const uploadsPath = path.join(process.cwd(), "uploads");
+    if (
+      existsSync &&
+      typeof existsSync === "function" &&
+      existsSync(uploadsPath)
+    ) {
+      app.use(
+        "/uploads/*",
+        serveStatic({
+          root: uploadsPath,
+        })
+      );
+    }
   }
-} catch (error) {
-  // Uploads directory doesn't exist, skip static serving
-  console.log("Uploads directory not found, skipping static file serving");
-}
+} catch (error) {}
 
 app.route("/api/auth", authRoutes);
 app.route("/admin", nodeRoutes);

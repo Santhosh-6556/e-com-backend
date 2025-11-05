@@ -11,3 +11,9 @@ bucket_name = "e-comerce"
 [build]
 command = ""
 
+# MongoDB Atlas Data API configuration (for Workers)
+# These will be set via wrangler secret put commands
+# [vars]
+# MONGODB_ATLAS_DATA_SOURCE = "Cluster0"
+# MONGODB_ATLAS_DATABASE = "ecommerce"
+
