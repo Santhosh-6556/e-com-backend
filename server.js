@@ -1,4 +1,7 @@
 // server.js (ESM version)
+// Import polyfills first before any other imports
+import "./polyfills.js";
+
 import dotenv from "dotenv";
 import app from "./app.js";
 import { Server } from "socket.io"; // socket.io

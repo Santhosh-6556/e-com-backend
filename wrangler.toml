@@ -10,11 +10,4 @@ bucket_name = "e-comerce"
 
 [build]
 command = ""
-node_compat = true
-
-# Exclude AWS SDK from bundling (not compatible with Workers)
-# We use dynamic imports for Node.js fallback only
-rules = [
-  { type = "ESModule", globs = ["**/*.js"], fallthrough = true }
-]
 

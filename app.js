@@ -1,3 +1,6 @@
+// Import polyfills first before any other imports
+import "./polyfills.js";
+
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "@hono/node-server/serve-static";
