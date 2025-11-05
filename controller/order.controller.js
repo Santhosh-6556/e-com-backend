@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import Order from "../models/order.model.js";
 import Cart from "../models/cart.model.js";
 import Product from "../models/addproduct.model.js";
