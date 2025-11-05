@@ -10,15 +10,17 @@ export const addProduct = async (req, res) => {
   try {
     const data = req.body;
 
-    const images = await Promise.all((data.images || []).map(uploadImage));
+    const images = await Promise.all(
+      (data.images || []).map((img) => uploadImage(img, req.env))
+    );
     const carouselImages = await Promise.all(
-      (data.carouselImages || []).map(uploadImage)
+      (data.carouselImages || []).map((img) => uploadImage(img, req.env))
     );
 
     const productDescription = await Promise.all(
       (data.productDescription || []).map(async (desc) => ({
         text: desc.text,
-        image: desc.image ? await uploadImage(desc.image) : null,
+        image: desc.image ? await uploadImage(desc.image, req.env) : null,
       }))
     );
 
@@ -115,7 +117,7 @@ export const editProduct = async (req, res) => {
     if ("images" in updates) {
       product.images = await Promise.all(
         (updates.images || []).map(async (img) =>
-          img.startsWith("http") ? img : await uploadImage(img)
+          img.startsWith("http") ? img : await uploadImage(img, req.env)
         )
       );
     }
@@ -123,7 +125,7 @@ export const editProduct = async (req, res) => {
     if ("carouselImages" in updates) {
       product.carouselImages = await Promise.all(
         (updates.carouselImages || []).map(async (img) =>
-          img.startsWith("http") ? img : await uploadImage(img)
+          img.startsWith("http") ? img : await uploadImage(img, req.env)
         )
       );
     }
@@ -135,7 +137,7 @@ export const editProduct = async (req, res) => {
           image: desc.image
             ? desc.image.startsWith("http")
               ? desc.image
-              : await uploadImage(desc.image)
+              : await uploadImage(desc.image, req.env)
             : null,
         }))
       );

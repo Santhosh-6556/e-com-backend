@@ -15,7 +15,8 @@ if (typeof process !== "undefined" && process.env) {
 export default {
   async fetch(request, env, ctx) {
     try {
-      return await app.fetch(request);
+      const response = await app.fetch(request, env);
+      return response;
     } catch (error) {
       console.error("Worker error:", error);
       return new Response("Internal Server Error", { status: 500 });

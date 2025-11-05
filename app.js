@@ -19,6 +19,13 @@ import order from "./routes/order.routes.js";
 
 const app = new Hono();
 
+app.use("*", async (c, next) => {
+  if (c.env) {
+    c.set("env", c.env);
+  }
+  await next();
+});
+
 app.use(
   "*",
   cors({

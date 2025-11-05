@@ -18,6 +18,7 @@ export const expressToHono = (handler) => {
         headers: Object.fromEntries(c.req.header()),
         header: (name) => c.req.header(name),
         user: c.get("user"),
+        env: c.get("env") || c.env,
       };
 
       const res = {

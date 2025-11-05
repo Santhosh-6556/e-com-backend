@@ -44,7 +44,7 @@ export const addCategory = async (req, res) => {
     const uploadedImage = image
       ? image.startsWith("http")
         ? image
-        : await uploadImage(image)
+        : await uploadImage(image, req.env)
       : null;
 
     const newCategory = await Category.create({
@@ -112,7 +112,7 @@ export const editCategory = async (req, res) => {
     if (typeof image === "string") {
       category.image = image.startsWith("http")
         ? image
-        : await uploadImage(image);
+        : await uploadImage(image, req.env);
     }
 
     if (identifier !== undefined) category.identifier = identifier;

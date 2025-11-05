@@ -4,3 +4,17 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 account_id = "1b2eef7a4f54a62b5315720ac41c5857"
 
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "e-comerce"
+
+[build]
+command = ""
+node_compat = true
+
+# Exclude AWS SDK from bundling (not compatible with Workers)
+# We use dynamic imports for Node.js fallback only
+rules = [
+  { type = "ESModule", globs = ["**/*.js"], fallthrough = true }
+]
+
