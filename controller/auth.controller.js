@@ -1,9 +1,29 @@
-import bcrypt from "bcrypt";
 import User from "../models/user.model.js";
 import { errorResponse, successResponse } from "../utils/response.js";
 import { generateToken } from "../utils/jwt.js";
 import { generateRecordId } from "../utils/recordId.js";
 import { sendEmail } from "../utils/mailer.js";
+
+const hashPassword = async (password) => {
+  if (typeof crypto !== "undefined" && crypto.subtle) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  } else {
+    try {
+      const bcrypt = await import("bcrypt");
+      return await bcrypt.hash(password, 10);
+    } catch (e) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+  }
+};
 
 const ADMIN_CREDENTIALS = {
   email: "admin@gmail.com",
@@ -237,7 +257,7 @@ export const adminLogin = async (c) => {
         email: ADMIN_CREDENTIALS.email,
         name: "Admin",
         role: "admin",
-        password: await bcrypt.hash(ADMIN_CREDENTIALS.password, 10),
+        password: await hashPassword(ADMIN_CREDENTIALS.password),
         isActive: true,
       });
     }
