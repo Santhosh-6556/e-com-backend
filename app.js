@@ -73,8 +73,43 @@ app.route("/admin", cart);
 app.route("/admin", user);
 app.route("/admin", order);
 
+app.get("/", (c) => {
+  return c.json({
+    success: true,
+    message: "E-commerce API is running",
+    version: "1.0.0",
+    endpoints: {
+      health: "/ping",
+      auth: "/api/auth",
+      public: {
+        banners: "/api/banners/all",
+        products: "/api/products/get",
+        categories: "/api/category/get",
+        faq: "/api/faq/all",
+      },
+      admin: "/admin",
+    },
+  });
+});
+
 app.get("/ping", (c) => {
   return c.text("pong");
+});
+
+// 404 handler for unmatched routes
+app.notFound((c) => {
+  return c.json({
+    success: false,
+    message: "Route not found",
+    path: c.req.path,
+    method: c.req.method,
+    availableEndpoints: {
+      health: "/ping",
+      banners: "/api/banners/all",
+      products: "/api/products/get",
+      categories: "/api/category/get",
+    },
+  }, 404);
 });
 
 export default app;

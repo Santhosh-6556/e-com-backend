@@ -11,11 +11,72 @@ export const expressToHono = (handler) => {
         }
       } catch (e) {}
 
+      // Convert Hono query to object
+      // In Hono, c.req.query() returns an object directly, not an iterable
+      let query = {};
+      try {
+        const queryObj = c.req.query();
+        if (queryObj && typeof queryObj === 'object') {
+          // If it's already an object (not iterable), use it directly
+          if (queryObj instanceof Map) {
+            query = Object.fromEntries(queryObj);
+          } else if (queryObj[Symbol.iterator]) {
+            // It's iterable (Array, Set, etc.)
+            query = Object.fromEntries(queryObj);
+          } else {
+            // It's a plain object
+            query = queryObj;
+          }
+        }
+      } catch (e) {
+        // Fallback to empty object
+        query = {};
+      }
+
+      // Convert Hono headers to object
+      // In Hono, c.req.header(name) returns a string, but c.req.header() without args might not work
+      // Get headers from c.req.raw.headers which is the actual Request headers
+      let headers = {};
+      try {
+        if (c.req.raw && c.req.raw.headers) {
+          const rawHeaders = c.req.raw.headers;
+          if (rawHeaders instanceof Headers) {
+            // Convert Headers object to plain object
+            headers = Object.fromEntries(rawHeaders);
+          } else if (rawHeaders instanceof Map) {
+            // Convert Map to plain object
+            headers = Object.fromEntries(rawHeaders);
+          } else if (typeof rawHeaders === 'object' && rawHeaders !== null) {
+            // It's already a plain object (like Node.js IncomingMessage.headers)
+            headers = { ...rawHeaders };
+          }
+        }
+      } catch (e) {
+        // Fallback: build headers object manually from individual header calls
+        try {
+          headers = {};
+          // Try to get common headers
+          const commonHeaders = ['content-type', 'authorization', 'user-agent', 'accept', 'host'];
+          commonHeaders.forEach(name => {
+            try {
+              const value = c.req.header(name);
+              if (value) {
+                headers[name] = value;
+              }
+            } catch (e) {
+              // Ignore errors for individual headers
+            }
+          });
+        } catch (e2) {
+          headers = {};
+        }
+      }
+
       const req = {
         body,
-        query: Object.fromEntries(c.req.query()),
+        query: query,
         params: c.req.param(),
-        headers: Object.fromEntries(c.req.header()),
+        headers: headers,
         header: (name) => c.req.header(name),
         user: c.get("user"),
         env: c.get("env") || c.env,

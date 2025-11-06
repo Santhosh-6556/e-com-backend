@@ -56,14 +56,49 @@ if (!isWorker && typeof process !== "undefined" && process.env) {
 
       connectDB();
 
+      // Create server with Hono app using @hono/node-server
+      // We need to create the server manually to attach Socket.IO
       const server = createServer(async (req, res) => {
         try {
-          const response = await app.fetch(req);
+          // Convert Node.js request to Web API Request for Hono
+          const protocol = req.headers['x-forwarded-proto'] || 'http';
+          const host = req.headers.host || 'localhost:5000';
+          const url = `${protocol}://${host}${req.url}`;
+          
+          // Read request body
+          const chunks = [];
+          for await (const chunk of req) {
+            chunks.push(chunk);
+          }
+          const bodyBuffer = chunks.length > 0 ? Buffer.concat(chunks) : null;
+          
+          // Create Headers object
+          const headers = new Headers();
+          for (const [key, value] of Object.entries(req.headers)) {
+            if (Array.isArray(value)) {
+              value.forEach(v => headers.append(key, String(v)));
+            } else if (value !== undefined && value !== null) {
+              headers.set(key, String(value));
+            }
+          }
+          
+          // Create Web API Request
+          const request = new Request(url, {
+            method: req.method || 'GET',
+            headers: headers,
+            body: bodyBuffer ? new Uint8Array(bodyBuffer) : null,
+          });
+
+          // Call Hono app with the Request
+          const response = await app.fetch(request, null);
+          
+          // Write response headers
           response.headers.forEach((value, key) => {
             res.setHeader(key, value);
           });
           res.statusCode = response.status;
 
+          // Write response body
           if (response.body) {
             const buffer = await response.arrayBuffer();
             res.end(Buffer.from(buffer));

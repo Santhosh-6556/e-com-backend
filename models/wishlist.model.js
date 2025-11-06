@@ -16,7 +16,7 @@ const wishlistSchema = new mongoose.Schema(
     userRecordId: {
       type: String,
       required: true,
-      unique: true, // Automatically creates an index
+      unique: true,
     },
     items: [wishlistItemSchema],
     itemCount: {
@@ -29,17 +29,22 @@ const wishlistSchema = new mongoose.Schema(
   }
 );
 
+// Update itemCount before saving
 wishlistSchema.pre("save", function (next) {
   this.itemCount = this.items.length;
   next();
 });
 
-// ✅ Keep only the secondary index
+// Index for better performance
+// Wrap in try-catch for Workers compatibility (Mongoose emits warnings via process.emitWarning)
 try {
+  wishlistSchema.index({ userRecordId: 1 });
   wishlistSchema.index({ "items.productRecordId": 1 });
 } catch (error) {
-  // Ignore index errors in Workers
+  // Silently ignore index errors in Workers (Mongoose is incompatible with Workers anyway)
+  // MongoDB connections will fail regardless due to TCP requirement
 }
 
 const Wishlist = mongoose.model("Wishlist", wishlistSchema);
+
 export default Wishlist;
