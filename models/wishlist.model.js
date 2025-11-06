@@ -38,7 +38,7 @@ wishlistSchema.pre("save", function (next) {
 // Index for better performance
 // Wrap in try-catch for Workers compatibility (Mongoose emits warnings via process.emitWarning)
 try {
-  wishlistSchema.index({ userRecordId: 1 });
+  // wishlistSchema.index({ userRecordId: 1 });
   wishlistSchema.index({ "items.productRecordId": 1 });
 } catch (error) {
   // Silently ignore index errors in Workers (Mongoose is incompatible with Workers anyway)
