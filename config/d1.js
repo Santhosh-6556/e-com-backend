@@ -30,6 +30,9 @@ export const initD1 = (db) => {
         const conditions = [];
 
         for (const [key, value] of Object.entries(filter)) {
+          // Skip $or - it's handled separately
+          if (key === "$or") continue;
+
           // Handle MongoDB operators
           if (value && typeof value === "object" && !Array.isArray(value)) {
             // Handle operators like { $ne: null }, { $gte: 100 }, etc.
@@ -41,10 +44,20 @@ export const initD1 = (db) => {
                 conditions.push(`${key} != ?`);
               }
             } else if (value.$gte !== undefined) {
-              values.push(value.$gte);
+              // Convert Date to timestamp if needed
+              const val =
+                value.$gte instanceof Date
+                  ? Math.floor(value.$gte.getTime() / 1000)
+                  : value.$gte;
+              values.push(val);
               conditions.push(`${key} >= ?`);
             } else if (value.$lte !== undefined) {
-              values.push(value.$lte);
+              // Convert Date to timestamp if needed
+              const val =
+                value.$lte instanceof Date
+                  ? Math.floor(value.$lte.getTime() / 1000)
+                  : value.$lte;
+              values.push(val);
               conditions.push(`${key} <= ?`);
             } else if (value.$gt !== undefined) {
               values.push(value.$gt);
@@ -70,12 +83,27 @@ export const initD1 = (db) => {
           } else if (Array.isArray(value)) {
             // Handle $in operator (array)
             const placeholders = value.map(() => "?").join(", ");
-            values.push(...value);
+            // Ensure all array values are primitives
+            const primitiveValues = value.map((v) => {
+              if (v instanceof Date) return Math.floor(v.getTime() / 1000);
+              if (typeof v === "object" && v !== null) return JSON.stringify(v);
+              return v;
+            });
+            values.push(...primitiveValues);
             conditions.push(`${key} IN (${placeholders})`);
           } else if (value === null) {
             conditions.push(`${key} IS NULL`);
           } else {
-            values.push(value);
+            // Convert Date to timestamp if needed, ensure primitive types
+            let val = value;
+            if (value instanceof Date) {
+              val = Math.floor(value.getTime() / 1000);
+            } else if (typeof value === "object" && value !== null) {
+              // Skip objects that aren't handled above - they shouldn't be here
+              console.warn(`Skipping object value for key ${key}:`, value);
+              continue;
+            }
+            values.push(val);
             conditions.push(`${key} = ?`);
           }
         }
@@ -95,7 +123,12 @@ export const initD1 = (db) => {
                     orParts.push(`${key} IS NULL`);
                   }
                 } else if (value.$gte !== undefined) {
-                  orValues.push(value.$gte);
+                  // Convert Date to timestamp if needed
+                  const val =
+                    value.$gte instanceof Date
+                      ? Math.floor(value.$gte.getTime() / 1000)
+                      : value.$gte;
+                  orValues.push(val);
                   orParts.push(`${key} >= ?`);
                 } else if (value === null) {
                   orParts.push(`${key} IS NULL`);
@@ -150,7 +183,20 @@ export const initD1 = (db) => {
     insertOne: async (table, data) => {
       const keys = Object.keys(data);
       const placeholders = keys.map(() => "?").join(", ");
-      const values = Object.values(data);
+      // Convert Date objects to timestamps and handle other complex types
+      const values = keys.map((key) => {
+        const val = data[key];
+        if (val instanceof Date) {
+          return Math.floor(val.getTime() / 1000);
+        } else if (
+          val !== null &&
+          typeof val === "object" &&
+          !Array.isArray(val)
+        ) {
+          return JSON.stringify(val);
+        }
+        return val;
+      });
 
       const query = `INSERT INTO ${table} (${keys.join(
         ", "
@@ -170,7 +216,20 @@ export const initD1 = (db) => {
 
       const results = [];
       for (const doc of documents) {
-        const values = keys.map((key) => doc[key]);
+        // Convert Date objects to timestamps and handle other complex types
+        const values = keys.map((key) => {
+          const val = doc[key];
+          if (val instanceof Date) {
+            return Math.floor(val.getTime() / 1000);
+          } else if (
+            val !== null &&
+            typeof val === "object" &&
+            !Array.isArray(val)
+          ) {
+            return JSON.stringify(val);
+          }
+          return val;
+        });
         const query = `INSERT INTO ${table} (${keys.join(
           ", "
         )}) VALUES (${placeholders})`;
@@ -188,12 +247,38 @@ export const initD1 = (db) => {
       const filterConditions = Object.keys(filter)
         .map((key) => `${key} = ?`)
         .join(" AND ");
-      const filterValues = Object.values(filter);
+      // Convert Date objects to timestamps and handle other complex types
+      const filterValues = Object.keys(filter).map((key) => {
+        const val = filter[key];
+        if (val instanceof Date) {
+          return Math.floor(val.getTime() / 1000);
+        } else if (
+          val !== null &&
+          typeof val === "object" &&
+          !Array.isArray(val)
+        ) {
+          return JSON.stringify(val);
+        }
+        return val;
+      });
 
       const updateFields = Object.keys(update)
         .map((key) => `${key} = ?`)
         .join(", ");
-      const updateValues = Object.values(update);
+      // Convert Date objects to timestamps and handle other complex types
+      const updateValues = Object.keys(update).map((key) => {
+        const val = update[key];
+        if (val instanceof Date) {
+          return Math.floor(val.getTime() / 1000);
+        } else if (
+          val !== null &&
+          typeof val === "object" &&
+          !Array.isArray(val)
+        ) {
+          return JSON.stringify(val);
+        }
+        return val;
+      });
 
       const query = `UPDATE ${table} SET ${updateFields} WHERE ${filterConditions}`;
       const result = await db
@@ -207,12 +292,38 @@ export const initD1 = (db) => {
       const filterConditions = Object.keys(filter)
         .map((key) => `${key} = ?`)
         .join(" AND ");
-      const filterValues = Object.values(filter);
+      // Convert Date objects to timestamps and handle other complex types
+      const filterValues = Object.keys(filter).map((key) => {
+        const val = filter[key];
+        if (val instanceof Date) {
+          return Math.floor(val.getTime() / 1000);
+        } else if (
+          val !== null &&
+          typeof val === "object" &&
+          !Array.isArray(val)
+        ) {
+          return JSON.stringify(val);
+        }
+        return val;
+      });
 
       const updateFields = Object.keys(update)
         .map((key) => `${key} = ?`)
         .join(", ");
-      const updateValues = Object.values(update);
+      // Convert Date objects to timestamps and handle other complex types
+      const updateValues = Object.keys(update).map((key) => {
+        const val = update[key];
+        if (val instanceof Date) {
+          return Math.floor(val.getTime() / 1000);
+        } else if (
+          val !== null &&
+          typeof val === "object" &&
+          !Array.isArray(val)
+        ) {
+          return JSON.stringify(val);
+        }
+        return val;
+      });
 
       const query = `UPDATE ${table} SET ${updateFields} WHERE ${filterConditions}`;
       const result = await db
