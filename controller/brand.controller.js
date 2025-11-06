@@ -108,9 +108,11 @@ export const getAllBrand = async (req, res) => {
     const filter = {};
     if (type) filter.type = type;
 
-    const brand = await Brand.find(filter).sort({
-      displayPriority: 1,
-      creationTime: -1,
+    const brand = await Brand.find(filter, {
+      sort: {
+        displayPriority: 1,
+        creationTime: -1,
+      },
     });
 
     return successResponse(res, "Categories fetched successfully", brand);
@@ -138,10 +140,15 @@ export const getBrandByRecordId = async (req, res) => {
 
 export const Brands = async (req, res) => {
   try {
-    const brand = await Brand.find().sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const brand = await Brand.find(
+      {},
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(res, "All Category fetched successfully", brand);
   } catch (error) {

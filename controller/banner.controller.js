@@ -132,13 +132,15 @@ export const getBanners = async (req, res) => {
     if (type) query.type = type;
     if (status !== undefined) query.status = status === "true";
 
-    query.status = true;
+    query.status = 1;
 
-    query.startDate = { $lte: new Date() };
+    const now = Math.floor(Date.now() / 1000);
+    query.startDate = { $lte: now };
 
-    const banners = await Banner.find(query)
-      .sort({ displayPriority: 1, position: 1, creationTime: -1 })
-      .limit(parseInt(limit));
+    const banners = await Banner.find(query, {
+      sort: { displayPriority: 1, position: 1, creationTime: -1 },
+      limit: parseInt(limit),
+    });
 
     return successResponse(res, "Banners fetched successfully", banners);
   } catch (error) {
@@ -169,15 +171,15 @@ export const recordBannerClick = async (req, res) => {
 
     if (!recordId) return errorResponse(res, "recordId is required", 400);
 
-    const banner = await Banner.findOneAndUpdate(
+    const banner = await Banner.findOne({ recordId });
+    if (!banner) return errorResponse(res, "Banner not found", 404);
+    
+    const updatedBanner = await Banner.updateOne(
       { recordId },
-      { $inc: { clicks: 1 } },
-      { new: true }
+      { clicks: (banner.clicks || 0) + 1 }
     );
 
-    if (!banner) return errorResponse(res, "Banner not found", 404);
-
-    return successResponse(res, "Click recorded successfully", banner);
+    return successResponse(res, "Click recorded successfully", updatedBanner);
   } catch (error) {
     console.error("RecordBannerClick Error:", error);
     return errorResponse(res, "Failed to record click", 500);
@@ -191,22 +193,24 @@ export const getAllBanners = async (req, res) => {
     const query = {};
 
     if (includeInactive === "false") {
-      query.status = true;
+      query.status = 1;
     }
 
     if (includeExpired === "false") {
+      const now = Math.floor(Date.now() / 1000);
       query.$or = [
-        { endDate: { $exists: false } },
         { endDate: null },
-        { endDate: { $gte: new Date() } },
+        { endDate: { $gte: now } },
       ];
-      query.startDate = { $lte: new Date() };
+      query.startDate = { $lte: now };
     }
 
-    const banners = await Banner.find(query).sort({
-      type: 1,
-      position: 1,
-      creationTime: -1,
+    const banners = await Banner.find(query, {
+      sort: {
+        type: 1,
+        position: 1,
+        creationTime: -1,
+      },
     });
 
     return successResponse(res, "All banners fetched successfully", banners);

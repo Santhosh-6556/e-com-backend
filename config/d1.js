@@ -27,18 +27,100 @@ export const initD1 = (db) => {
       const values = [];
 
       if (Object.keys(filter).length > 0) {
-        const whereConditions = Object.keys(filter)
-          .map((key) => {
-            if (Array.isArray(filter[key])) {
-              const placeholders = filter[key].map(() => "?").join(", ");
-              values.push(...filter[key]);
-              return `${key} IN (${placeholders})`;
+        const conditions = [];
+
+        for (const [key, value] of Object.entries(filter)) {
+          // Handle MongoDB operators
+          if (value && typeof value === "object" && !Array.isArray(value)) {
+            // Handle operators like { $ne: null }, { $gte: 100 }, etc.
+            if (value.$ne !== undefined) {
+              if (value.$ne === null) {
+                conditions.push(`${key} IS NOT NULL`);
+              } else {
+                values.push(value.$ne);
+                conditions.push(`${key} != ?`);
+              }
+            } else if (value.$gte !== undefined) {
+              values.push(value.$gte);
+              conditions.push(`${key} >= ?`);
+            } else if (value.$lte !== undefined) {
+              values.push(value.$lte);
+              conditions.push(`${key} <= ?`);
+            } else if (value.$gt !== undefined) {
+              values.push(value.$gt);
+              conditions.push(`${key} > ?`);
+            } else if (value.$lt !== undefined) {
+              values.push(value.$lt);
+              conditions.push(`${key} < ?`);
+            } else if (value.$exists !== undefined) {
+              if (value.$exists) {
+                conditions.push(`${key} IS NOT NULL`);
+              } else {
+                conditions.push(`${key} IS NULL`);
+              }
+            } else if (value.$in !== undefined) {
+              const placeholders = value.$in.map(() => "?").join(", ");
+              values.push(...value.$in);
+              conditions.push(`${key} IN (${placeholders})`);
+            } else {
+              // Regular object (nested), convert to JSON comparison
+              values.push(JSON.stringify(value));
+              conditions.push(`${key} = ?`);
             }
-            values.push(filter[key]);
-            return `${key} = ?`;
-          })
-          .join(" AND ");
-        query += ` WHERE ${whereConditions}`;
+          } else if (Array.isArray(value)) {
+            // Handle $in operator (array)
+            const placeholders = value.map(() => "?").join(", ");
+            values.push(...value);
+            conditions.push(`${key} IN (${placeholders})`);
+          } else if (value === null) {
+            conditions.push(`${key} IS NULL`);
+          } else {
+            values.push(value);
+            conditions.push(`${key} = ?`);
+          }
+        }
+
+        // Handle $or operator
+        if (filter.$or) {
+          const orConditions = filter.$or.map((orGroup) => {
+            const orParts = [];
+            const orValues = [];
+
+            for (const [key, value] of Object.entries(orGroup)) {
+              if (value && typeof value === "object" && !Array.isArray(value)) {
+                if (value.$exists !== undefined) {
+                  if (value.$exists) {
+                    orParts.push(`${key} IS NOT NULL`);
+                  } else {
+                    orParts.push(`${key} IS NULL`);
+                  }
+                } else if (value.$gte !== undefined) {
+                  orValues.push(value.$gte);
+                  orParts.push(`${key} >= ?`);
+                } else if (value === null) {
+                  orParts.push(`${key} IS NULL`);
+                } else {
+                  orValues.push(JSON.stringify(value));
+                  orParts.push(`${key} = ?`);
+                }
+              } else if (value === null) {
+                orParts.push(`${key} IS NULL`);
+              } else {
+                orValues.push(value);
+                orParts.push(`${key} = ?`);
+              }
+            }
+
+            values.push(...orValues);
+            return `(${orParts.join(" AND ")})`;
+          });
+
+          conditions.push(`(${orConditions.join(" OR ")})`);
+        }
+
+        if (conditions.length > 0) {
+          query += ` WHERE ${conditions.join(" AND ")}`;
+        }
       }
 
       if (options.sort) {

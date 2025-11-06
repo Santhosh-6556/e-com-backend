@@ -70,11 +70,9 @@ export const getNodeMenuData = async (req, res) => {
     const { identifier } = req.query;
     const filter = identifier ? { identifier } : {};
 
-    const nodes = await Node.find(filter)
-      .sort({ displayPriority: 1, creationTime: -1 })
-      .select(
-        "path parentNode displayPriority identifier shortDescription status"
-      );
+    const nodes = await Node.find(filter, {
+      sort: { displayPriority: 1, creationTime: -1 },
+    });
 
     return successResponse(res, "Nodes fetched successfully", nodes);
   } catch (error) {
@@ -87,14 +85,16 @@ export const getParentNodes = async (req, res) => {
   try {
     const { identifier } = req.query;
 
-    const filter = { parentNode: null };
+    const filter = { parentNodeRecordId: null };
     if (identifier) {
       filter.identifier = identifier;
     }
 
-    const nodes = await Node.find(filter).sort({
-      displayPriority: 1,
-      creationTime: -1,
+    const nodes = await Node.find(filter, {
+      sort: {
+        displayPriority: 1,
+        creationTime: -1,
+      },
     });
 
     const formattedNodes = nodes.map((node) => ({
@@ -221,9 +221,7 @@ export const getNodeByRecordId = async (req, res) => {
     }
 
     // Find the node by recordId
-    const node = await Node.findOne({ recordId }).select(
-      "recordId path parentNode displayPriority identifier shortDescription status createdBy modifiedBy creationTime lastModified"
-    );
+    const node = await Node.findOne({ recordId });
 
     if (!node) {
       return errorResponse(res, "Node not found", 404);
@@ -238,10 +236,15 @@ export const getNodeByRecordId = async (req, res) => {
 
 export const getAllNodes = async (req, res) => {
   try {
-    const nodes = await Node.find().sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const nodes = await Node.find(
+      {},
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(res, "All nodes fetched successfully", nodes);
   } catch (error) {

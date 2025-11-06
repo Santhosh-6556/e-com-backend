@@ -83,7 +83,7 @@ export const deleteFAQ = async (req, res) => {
 // ✅ Get All FAQs
 export const getAllFAQs = async (req, res) => {
   try {
-    const faqs = await FAQ.find().sort({ creationTime: -1 });
+    const faqs = await FAQ.find({}, { sort: { creationTime: -1 } });
     return successResponse(res, "FAQs fetched successfully", faqs);
   } catch (err) {
     console.error("Get FAQs Error:", err);

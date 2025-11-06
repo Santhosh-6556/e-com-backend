@@ -87,7 +87,7 @@ export const deleteTax = async (req, res) => {
 // ✅ Get All Taxes
 export const getAllTaxes = async (req, res) => {
   try {
-    const taxes = await Tax.find().sort({ creationTime: -1 });
+    const taxes = await Tax.find({}, { sort: { creationTime: -1 } });
 
     return successResponse(res, "Taxes fetched successfully", taxes);
   } catch (error) {

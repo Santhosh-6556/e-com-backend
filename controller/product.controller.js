@@ -206,7 +206,7 @@ export const deleteProduct = async (req, res) => {
 // ✅ View All Products
 export const getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find().sort({ creationTime: -1 });
+    const products = await Product.find({}, { sort: { creationTime: -1 } });
 
     return successResponse(res, "Products fetched successfully", products);
   } catch (error) {
@@ -271,32 +271,36 @@ export const getFilteredProducts = async (req, res) => {
     const query = {};
 
     if (category?.recordId) {
-      query["category.recordId"] = category.recordId;
+      query.categoryRecordId = category.recordId;
     }
 
     if (subcategory?.recordId) {
-      query["subcategory.recordId"] = subcategory.recordId;
+      query.subcategoryRecordId = subcategory.recordId;
     }
 
     if (brand?.recordId) {
-      query["brand.recordId"] = brand.recordId;
+      query.brandRecordId = brand.recordId;
     }
 
     if (minPrice !== undefined || maxPrice !== undefined) {
-      query.price = {};
-      if (minPrice !== undefined) query.price.$gte = minPrice;
-      if (maxPrice !== undefined) query.price.$lte = maxPrice;
+      if (minPrice !== undefined && maxPrice !== undefined) {
+        query.price = { $gte: minPrice, $lte: maxPrice };
+      } else if (minPrice !== undefined) {
+        query.price = { $gte: minPrice };
+      } else if (maxPrice !== undefined) {
+        query.price = { $lte: maxPrice };
+      }
     }
 
     if (minRating !== undefined) {
-      query["ratings.average"] = { $gte: minRating };
+      query.ratingsAverage = { $gte: minRating };
     }
 
     if (status !== undefined) {
       query.status = status;
     }
 
-    const products = await Product.find(query).sort({ creationTime: -1 });
+    const products = await Product.find(query, { sort: { creationTime: -1 } });
 
     return successResponse(
       res,
@@ -311,10 +315,15 @@ export const getFilteredProducts = async (req, res) => {
 
 export const Products = async (req, res) => {
   try {
-    const products = await Product.find().sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const products = await Product.find(
+      {},
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(res, "All products fetched successfully", products);
   } catch (error) {

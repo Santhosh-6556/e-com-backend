@@ -169,9 +169,11 @@ export const getAllCategories = async (req, res) => {
     const filter = {};
     if (type) filter.type = type;
 
-    const categories = await Category.find(filter).sort({
-      displayPriority: 1,
-      creationTime: -1,
+    const categories = await Category.find(filter, {
+      sort: {
+        displayPriority: 1,
+        creationTime: -1,
+      },
     });
 
     return successResponse(res, "Categories fetched successfully", categories);
@@ -198,10 +200,15 @@ export const getCategoryByRecordId = async (req, res) => {
 
 export const getCategories = async (req, res) => {
   try {
-    const categories = await Category.find({ parentCategory: null }).sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const categories = await Category.find(
+      { parentCategoryRecordId: null },
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(
       res,
@@ -216,12 +223,17 @@ export const getCategories = async (req, res) => {
 
 export const getSubcategories = async (req, res) => {
   try {
-    const subcategories = await Category.find({
-      parentCategory: { $ne: null },
-    }).sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const subcategories = await Category.find(
+      {
+        parentCategoryRecordId: { $ne: null },
+      },
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(
       res,
@@ -236,10 +248,15 @@ export const getSubcategories = async (req, res) => {
 
 export const Categories = async (req, res) => {
   try {
-    const category = await Category.find().sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const category = await Category.find(
+      {},
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(res, "All Category fetched successfully", category);
   } catch (error) {
@@ -250,10 +267,15 @@ export const Categories = async (req, res) => {
 
 export const getCategory = async (req, res) => {
   try {
-    const category = await Category.find().sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const category = await Category.find(
+      {},
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(res, "All Category fetched successfully", category);
   } catch (error) {
@@ -264,10 +286,15 @@ export const getCategory = async (req, res) => {
 
 export const getAdminCategories = async (req, res) => {
   try {
-    const category = await Category.find().sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const category = await Category.find(
+      {},
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(res, "All Category fetched successfully", category);
   } catch (error) {
@@ -278,12 +305,17 @@ export const getAdminCategories = async (req, res) => {
 
 export const getAdminSubcategories = async (req, res) => {
   try {
-    const subcategories = await Category.find({
-      parentCategory: { $ne: null },
-    }).sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const subcategories = await Category.find(
+      {
+        parentCategoryRecordId: { $ne: null },
+      },
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(
       res,
