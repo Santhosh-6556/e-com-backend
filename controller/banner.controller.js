@@ -88,7 +88,7 @@ export const updateBanner = async (req, res) => {
     });
 
     const updatedBanner = await Banner.updateOne(
-      { recordId: banner },
+      { recordId: bannerId },
       {
         ...updates,
         modifiedBy: req.user?.email || "system",

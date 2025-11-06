@@ -71,7 +71,7 @@ export const removeFromWishlist = async (req, res) => {
       return errorResponse(res, "User ID and Product ID are required", 400);
     }
 
-    const wishlist = await Wishlist.findOne({ userRecordId: userId });
+    let wishlist = await Wishlist.findOne({ userRecordId: userId });
 
     if (!wishlist) {
       return errorResponse(res, "Wishlist not found", 404);
@@ -197,7 +197,7 @@ export const clearWishlist = async (req, res) => {
       return errorResponse(res, "User ID is required", 400);
     }
 
-    const wishlist = await Wishlist.findOne({ userRecordId: userId });
+    let wishlist = await Wishlist.findOne({ userRecordId: userId });
 
     if (!wishlist) {
       return errorResponse(res, "Wishlist not found", 404);

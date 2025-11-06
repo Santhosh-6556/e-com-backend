@@ -142,7 +142,7 @@ export const updateCartItem = async (req, res) => {
         400
       );
 
-    const cart = await Cart.findOne({ userId });
+    let cart = await Cart.findOne({ userId });
     if (!cart) return errorResponse(res, "Cart not found", 404);
 
     const item = cart.items.find((i) => i.productId === productRecordId);
@@ -165,7 +165,7 @@ export const removeFromCart = async (req, res) => {
     if (!userId || !productRecordId)
       return errorResponse(res, "User ID and product ID are required", 400);
 
-    const cart = await Cart.findOne({ userId });
+    let cart = await Cart.findOne({ userId });
     if (!cart) return errorResponse(res, "Cart not found", 404);
 
     const item = cart.items.find((i) => i.productId === productRecordId);
@@ -191,7 +191,7 @@ export const clearCart = async (req, res) => {
     const { userId } = req.body;
     if (!userId) return errorResponse(res, "User ID is required", 400);
 
-    const cart = await Cart.findOne({ userId });
+    let cart = await Cart.findOne({ userId });
     if (!cart) return errorResponse(res, "Cart not found", 404);
 
     // Remove all items
