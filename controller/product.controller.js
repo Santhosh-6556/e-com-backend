@@ -165,12 +165,18 @@ export const editProduct = async (req, res) => {
       }
     });
 
-    product.modifiedBy = req.user?.email || "system";
-    product.lastModified = Date.now();
+    const updateData = {
+      ...updates,
+      modifiedBy: req.user?.email || "system",
+      lastModified: Math.floor(Date.now() / 1000),
+    };
 
-    await product.save();
+    const updatedProduct = await Product.updateOne(
+      { recordId: productId },
+      updateData
+    );
 
-    return successResponse(res, "Product updated successfully", product);
+    return successResponse(res, "Product updated successfully", updatedProduct);
   } catch (error) {
     console.error("EditProduct Error:", error);
     return errorResponse(res, "Failed to update product", 500);
@@ -184,7 +190,10 @@ export const deleteProduct = async (req, res) => {
       return errorResponse(res, "recordId is required", 400);
     }
 
-    const deleted = await Product.findOneAndDelete({ recordId });
+    const product = await Product.findOne({ recordId });
+    if (!product) return errorResponse(res, "Product not found", 404);
+    await Product.deleteOne({ recordId });
+    const deleted = product;
     if (!deleted) return errorResponse(res, "Product not found", 404);
 
     return successResponse(res, "Product deleted successfully", deleted);

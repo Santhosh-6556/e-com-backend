@@ -24,9 +24,8 @@ export const addToWishlist = async (req, res) => {
     let wishlist = await Wishlist.findOne({ userRecordId: userId });
 
     if (!wishlist) {
-      wishlist = new Wishlist({
+      wishlist = await Wishlist.create({
         userRecordId: userId,
-        items: [],
       });
     }
 
@@ -38,20 +37,16 @@ export const addToWishlist = async (req, res) => {
       return errorResponse(res, "Product already in wishlist", 400);
     }
 
-    wishlist.items.push({
-      productRecordId: productId,
-      addedAt: new Date(),
-    });
-
-    await wishlist.save();
+    await Wishlist.addItem(userId, productId);
+    wishlist = await Wishlist.findOne({ userRecordId: userId });
 
     return successResponse(res, "Product added to wishlist", {
       wishlist: {
-        id: wishlist._id,
+        id: wishlist.id,
         itemCount: wishlist.itemCount,
         userId: wishlist.userRecordId,
         items: wishlist.items.map((item) => ({
-          id: item._id,
+          id: item.id,
           productRecordId: item.productRecordId,
           addedAt: item.addedAt,
         })),
@@ -82,24 +77,24 @@ export const removeFromWishlist = async (req, res) => {
       return errorResponse(res, "Wishlist not found", 404);
     }
 
-    const initialLength = wishlist.items.length;
-    wishlist.items = wishlist.items.filter(
-      (item) => item.productRecordId !== productId
+    const existingItem = wishlist.items.find(
+      (item) => item.productRecordId === productId
     );
 
-    if (wishlist.items.length === initialLength) {
+    if (!existingItem) {
       return errorResponse(res, "Product not found in wishlist", 404);
     }
 
-    await wishlist.save();
+    await Wishlist.removeItem(userId, productId);
+    wishlist = await Wishlist.findOne({ userRecordId: userId });
 
     return successResponse(res, "Product removed from wishlist", {
       wishlist: {
-        id: wishlist._id,
+        id: wishlist.id,
         itemCount: wishlist.itemCount,
         userId: wishlist.userRecordId,
         items: wishlist.items.map((item) => ({
-          id: item._id,
+          id: item.id,
           productRecordId: item.productRecordId,
           addedAt: item.addedAt,
         })),
@@ -124,9 +119,7 @@ export const getWishlist = async (req, res) => {
       return errorResponse(res, "User ID is required", 400);
     }
 
-    const wishlist = await Wishlist.findOne({ userRecordId: userId }).sort({
-      "items.addedAt": -1,
-    });
+    const wishlist = await Wishlist.findOne({ userRecordId: userId });
 
     if (!wishlist) {
       return successResponse(res, "Wishlist is empty", {
@@ -140,7 +133,7 @@ export const getWishlist = async (req, res) => {
 
     const productRecordIds = wishlist.items.map((item) => item.productRecordId);
     const products = await Product.find({
-      recordId: { $in: productRecordIds },
+      recordId: productRecordIds,
     });
 
     const productMap = {};
@@ -151,7 +144,7 @@ export const getWishlist = async (req, res) => {
     const itemsWithProducts = wishlist.items.map((item) => {
       const product = productMap[item.productRecordId];
       return {
-        id: item._id,
+        id: item.id,
         productRecordId: item.productRecordId,
         product: product
           ? {
@@ -180,7 +173,7 @@ export const getWishlist = async (req, res) => {
 
     return successResponse(res, "Wishlist retrieved successfully", {
       wishlist: {
-        id: wishlist._id,
+        id: wishlist.id,
         itemCount: wishlist.itemCount,
         items: itemsWithProducts,
       },
@@ -210,12 +203,15 @@ export const clearWishlist = async (req, res) => {
       return errorResponse(res, "Wishlist not found", 404);
     }
 
-    wishlist.items = [];
-    await wishlist.save();
+    // Remove all items
+    for (const item of wishlist.items) {
+      await Wishlist.removeItem(userId, item.productRecordId);
+    }
+    wishlist = await Wishlist.findOne({ userRecordId: userId });
 
     return successResponse(res, "Wishlist cleared successfully", {
       wishlist: {
-        id: wishlist._id,
+        id: wishlist.id,
         itemCount: 0,
         items: [],
       },
@@ -267,12 +263,10 @@ export const checkProductInWishlist = async (req, res) => {
       return errorResponse(res, "User ID and Product ID are required", 400);
     }
 
-    const wishlist = await Wishlist.findOne({
-      userRecordId: userId,
-      "items.productRecordId": productId,
-    });
-
-    const isInWishlist = !!wishlist;
+    const wishlist = await Wishlist.findOne({ userRecordId: userId });
+    const isInWishlist =
+      wishlist &&
+      wishlist.items.some((item) => item.productRecordId === productId);
 
     return successResponse(res, "Product wishlist status checked", {
       isInWishlist: isInWishlist,
@@ -318,7 +312,7 @@ export const getWishlistProducts = async (req, res) => {
     const productRecordIds = paginatedItems.map((item) => item.productRecordId);
 
     const products = await Product.find({
-      recordId: { $in: productRecordIds },
+      recordId: productRecordIds,
     });
 
     const orderedProducts = paginatedItems

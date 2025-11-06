@@ -7,7 +7,8 @@ const generateRecordId = () => Date.now().toString();
 // ✅ Add Brand
 export const addBrand = async (req, res) => {
   try {
-    const { identifier, name, shortDescription, image,displayPriority} = req.body;
+    const { identifier, name, shortDescription, image, displayPriority } =
+      req.body;
 
     if (!identifier) {
       return errorResponse(res, "Identifier is required", 400);
@@ -60,26 +61,25 @@ export const editBrand = async (req, res) => {
       return errorResponse(res, "Brand not found", 404);
     }
 
+    const updatedBrand = await Brand.updateOne(
+      { recordId: brandId },
+      {
+        identifier: identifier ?? brand.identifier,
+        name: name ?? brand.name,
+        shortDescription: shortDescription ?? brand.shortDescription,
+        image: image ?? brand.image,
+        status: status ?? brand.status,
+        displayPriority: displayPriority ?? brand.displayPriority,
+        lastModified: Math.floor(Date.now() / 1000),
+      }
+    );
 
-    // Update fields
-    brand.identifier = identifier ?? brand.identifier;
-    brand.name = name ?? brand.name;
-    brand.shortDescription = shortDescription ?? brand.shortDescription;
-    brand.image = image ?? brand.image;
-    brand.status = status ?? brand.status;
-    brand.displayPriority = displayPriority ?? brand.displayPriority;
- 
-    brand.lastModified = Date.now();
-
-    await brand.save();
-
-    return successResponse(res, "Brand updated successfully", brand);
+    return successResponse(res, "Brand updated successfully", updatedBrand);
   } catch (error) {
     console.error("Edit Brand Error:", error);
     return errorResponse(res, "Failed to update Brand", 500);
   }
 };
-
 
 // ✅ Delete Brand by recordId
 export const deleteBrand = async (req, res) => {
@@ -88,7 +88,10 @@ export const deleteBrand = async (req, res) => {
 
     if (!recordId) return errorResponse(res, "recordId is required", 400);
 
-    const deleted = await Brand.findOneAndDelete({ recordId });
+    const brand = await Brand.findOne({ recordId });
+    if (!brand) return errorResponse(res, "Brand not found", 404);
+    await Brand.deleteOne({ recordId });
+    const deleted = brand;
     if (!deleted) return errorResponse(res, "Brand not found", 404);
 
     return successResponse(res, "Brand deleted successfully", deleted);
@@ -135,8 +138,10 @@ export const getBrandByRecordId = async (req, res) => {
 
 export const Brands = async (req, res) => {
   try {
-    const brand = await Brand.find()
-      .sort({ displayPriority: 1, creationTime: -1 });
+    const brand = await Brand.find().sort({
+      displayPriority: 1,
+      creationTime: -1,
+    });
 
     return successResponse(res, "All Category fetched successfully", brand);
   } catch (error) {

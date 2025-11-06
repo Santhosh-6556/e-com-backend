@@ -8,12 +8,12 @@ account_id = "1b2eef7a4f54a62b5315720ac41c5857"
 binding = "R2_BUCKET"
 bucket_name = "e-comerce"
 
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "ecommerce-db"
+database_id = "f935967a-692d-427e-81e1-b08076ac9281"
+
 [build]
 command = ""
-
-# MongoDB Atlas Data API configuration (for Workers)
-# These will be set via wrangler secret put commands
-# [vars]
-# MONGODB_ATLAS_DATA_SOURCE = "Cluster0"
-# MONGODB_ATLAS_DATABASE = "ecommerce"
 

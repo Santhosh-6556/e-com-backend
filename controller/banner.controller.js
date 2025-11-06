@@ -87,10 +87,16 @@ export const updateBanner = async (req, res) => {
       }
     });
 
-    banner.modifiedBy = req.user?.email || "system";
-    await banner.save();
+    const updatedBanner = await Banner.updateOne(
+      { recordId: banner },
+      {
+        ...updates,
+        modifiedBy: req.user?.email || "system",
+        lastModified: Math.floor(Date.now() / 1000),
+      }
+    );
 
-    return successResponse(res, "Banner updated successfully", banner);
+    return successResponse(res, "Banner updated successfully", updatedBanner);
   } catch (error) {
     console.error("UpdateBanner Error:", error);
     return errorResponse(res, "Failed to update banner", 500);
@@ -105,7 +111,10 @@ export const deleteBanner = async (req, res) => {
       return errorResponse(res, "recordId is required", 400);
     }
 
-    const deleted = await Banner.findOneAndDelete({ recordId });
+    const banner = await Banner.findOne({ recordId });
+    if (!banner) return errorResponse(res, "Banner not found", 404);
+    await Banner.deleteOne({ recordId });
+    const deleted = banner;
     if (!deleted) return errorResponse(res, "Banner not found", 404);
 
     return successResponse(res, "Banner deleted successfully", deleted);

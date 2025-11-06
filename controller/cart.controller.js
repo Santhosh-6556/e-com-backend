@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
 import Cart from "../models/cart.model.js";
 import Product from "../models/addproduct.model.js";
+import Tax from "../models/tax.model.js";
 import { generateRecordId } from "../utils/recordId.js";
 import { successResponse, errorResponse } from "../utils/response.js";
 
@@ -17,7 +17,7 @@ const formatCartResponse = async (cart) => {
 
       let taxRate = 0;
       if (product.tax?.recordId) {
-        const taxDoc = await mongoose.model("Tax").findOne({
+        const taxDoc = await Tax.findOne({
           recordId: product.tax.recordId,
           status: true,
         });
@@ -29,7 +29,7 @@ const formatCartResponse = async (cart) => {
       const total = subtotal + itemTax;
 
       return {
-        id: item._id,
+        id: item.id,
         productId: product.recordId,
         name: product.identifier,
         slug: product.slug,
@@ -102,19 +102,27 @@ export const addToCart = async (req, res) => {
 
     let cart = await Cart.findOne({ userId });
     if (!cart) {
-      cart = new Cart({ recordId: generateRecordId(), userId, items: [] });
+      cart = await Cart.create({
+        recordId: generateRecordId(),
+        userId,
+      });
     }
 
     const existingItem = cart.items.find(
       (i) => i.productId === productRecordId
     );
     if (existingItem) {
-      existingItem.quantity += quantity;
+      await Cart.updateItem(cart.recordId, existingItem.id, {
+        quantity: existingItem.quantity + quantity,
+      });
     } else {
-      cart.items.push({ productId: productRecordId, quantity });
+      await Cart.addItem(cart.recordId, {
+        productId: productRecordId,
+        quantity,
+      });
     }
 
-    await cart.save();
+    cart = await Cart.findOne({ userId });
 
     const response = await formatCartResponse(cart);
     return successResponse(res, "Item added to cart successfully", response);
@@ -140,8 +148,8 @@ export const updateCartItem = async (req, res) => {
     const item = cart.items.find((i) => i.productId === productRecordId);
     if (!item) return errorResponse(res, "Item not found in cart", 404);
 
-    item.quantity = quantity;
-    await cart.save();
+    await Cart.updateItem(cart.recordId, item.id, { quantity });
+    cart = await Cart.findOne({ userId });
 
     const response = await formatCartResponse(cart);
     return successResponse(res, "Cart item updated successfully", response);
@@ -160,8 +168,11 @@ export const removeFromCart = async (req, res) => {
     const cart = await Cart.findOne({ userId });
     if (!cart) return errorResponse(res, "Cart not found", 404);
 
-    cart.items = cart.items.filter((i) => i.productId !== productRecordId);
-    await cart.save();
+    const item = cart.items.find((i) => i.productId === productRecordId);
+    if (item) {
+      await Cart.removeItem(cart.recordId, item.id);
+    }
+    cart = await Cart.findOne({ userId });
 
     const response = await formatCartResponse(cart);
     return successResponse(
@@ -183,8 +194,11 @@ export const clearCart = async (req, res) => {
     const cart = await Cart.findOne({ userId });
     if (!cart) return errorResponse(res, "Cart not found", 404);
 
-    cart.items = [];
-    await cart.save();
+    // Remove all items
+    for (const item of cart.items) {
+      await Cart.removeItem(cart.recordId, item.id);
+    }
+    cart = await Cart.findOne({ userId });
 
     const response = {
       cartId: cart.recordId,

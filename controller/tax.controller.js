@@ -49,14 +49,16 @@ export const editTax = async (req, res) => {
       return errorResponse(res, "Tax not found", 404);
     }
 
-    tax.identifier = identifier ?? tax.identifier;
-    tax.rate = rate ?? tax.rate;
-    tax.status = status ?? tax.status;
-    tax.lastModified = Date.now();
+    const updatedTax = await Tax.updateOne(
+      { recordId },
+      {
+        identifier: identifier ?? tax.identifier,
+        rate: rate ?? tax.rate,
+        status: status ?? tax.status,
+      }
+    );
 
-    await tax.save();
-
-    return successResponse(res, "Tax updated successfully", tax);
+    return successResponse(res, "Tax updated successfully", updatedTax);
   } catch (error) {
     console.error("Edit Tax Error:", error);
     return errorResponse(res, "Failed to update Tax", 500);
@@ -70,8 +72,10 @@ export const deleteTax = async (req, res) => {
 
     if (!recordId) return errorResponse(res, "recordId is required", 400);
 
-    const deleted = await Tax.findOneAndDelete({ recordId });
-    if (!deleted) return errorResponse(res, "Tax not found", 404);
+    const tax = await Tax.findOne({ recordId });
+    if (!tax) return errorResponse(res, "Tax not found", 404);
+    await Tax.deleteOne({ recordId });
+    const deleted = tax;
 
     return successResponse(res, "Tax deleted successfully", deleted);
   } catch (error) {

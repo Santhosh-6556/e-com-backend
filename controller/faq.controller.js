@@ -43,15 +43,18 @@ export const editFAQ = async (req, res) => {
     const faq = await FAQ.findOne({ recordId });
     if (!faq) return errorResponse(res, "FAQ not found", 404);
 
-    faq.identifier = identifier ?? faq.identifier;
-    faq.question = question ?? faq.question;
-    faq.answer = answer ?? faq.answer;
-    faq.status = status ?? faq.status;
-    faq.lastModified = Date.now();
+    const updatedFAQ = await FAQ.updateOne(
+      { recordId },
+      {
+        identifier: identifier ?? faq.identifier,
+        question: question ?? faq.question,
+        answer: answer ?? faq.answer,
+        status: status ?? faq.status,
+        lastModified: Math.floor(Date.now() / 1000),
+      }
+    );
 
-    await faq.save();
-
-    return successResponse(res, "FAQ updated successfully", faq);
+    return successResponse(res, "FAQ updated successfully", updatedFAQ);
   } catch (err) {
     console.error("Edit FAQ Error:", err);
     return errorResponse(res, "Failed to update FAQ", 500);
@@ -65,8 +68,10 @@ export const deleteFAQ = async (req, res) => {
 
     if (!recordId) return errorResponse(res, "recordId is required", 400);
 
-    const deleted = await FAQ.findOneAndDelete({ recordId });
-    if (!deleted) return errorResponse(res, "FAQ not found", 404);
+    const faq = await FAQ.findOne({ recordId });
+    if (!faq) return errorResponse(res, "FAQ not found", 404);
+    await FAQ.deleteOne({ recordId });
+    const deleted = faq;
 
     return successResponse(res, "FAQ deleted successfully", deleted);
   } catch (err) {

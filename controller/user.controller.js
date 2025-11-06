@@ -26,19 +26,23 @@ export const updateUserProfile = async (req, res) => {
     if (!user) return errorResponse(res, "User not found", 404);
 
     // Update only the provided fields
-    if (name) user.name = name;
-    if (email) user.email = email;
-    if (phone) user.phone = phone;
-    if (dob) user.dob = dob;
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (phone) updateData.phone = phone;
+    if (dob) updateData.dob = dob;
 
-    await user.save();
+    const updatedUser = await User.updateOne(
+      { recordId: recordId },
+      updateData
+    );
 
     return successResponse(res, "Profile updated successfully", {
-      recordId: user.recordId,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      dob: user.dob,
+      recordId: updatedUser.recordId,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      phone: updatedUser.phone,
+      dob: updatedUser.dob,
     });
   } catch (err) {
     console.error("UpdateUserProfile Error:", err);
@@ -81,10 +85,6 @@ export const addAddress = async (req, res) => {
     const user = await User.findOne({ recordId: userId });
     if (!user) return errorResponse(res, "User not found", 404);
 
-    if (isDefaultDelivery) {
-      user.addresses.forEach((addr) => (addr.isDefaultDelivery = false));
-    }
-
     const newAddress = {
       recordId: generateRecordId(),
       firstName,
@@ -101,8 +101,7 @@ export const addAddress = async (req, res) => {
       isDefaultDelivery: !!isDefaultDelivery,
     };
 
-    user.addresses.push(newAddress);
-    await user.save();
+    await User.addAddress(userId, newAddress);
 
     return successResponse(res, "Address added successfully", newAddress);
   } catch (err) {
@@ -157,26 +156,28 @@ export const updateAddress = async (req, res) => {
     const address = user.addresses.find((addr) => addr.recordId === recordId);
     if (!address) return errorResponse(res, "Address not found", 404);
 
-    if (firstName) address.firstName = firstName;
-    if (lastName) address.lastName = lastName;
-    if (phone) address.phone = phone;
-    if (email) address.email = email;
-    if (addressType) address.addressType = addressType;
-    if (pinCode) address.pinCode = pinCode;
-    if (line1) address.line1 = line1;
-    if (line2) address.line2 = line2;
-    if (city) address.city = city;
-    if (state) address.state = state;
-    if (country) address.country = country;
+    const updateData = {};
+    if (firstName) updateData.firstName = firstName;
+    if (lastName) updateData.lastName = lastName;
+    if (phone) updateData.phone = phone;
+    if (email) updateData.email = email;
+    if (addressType) updateData.addressType = addressType;
+    if (pinCode) updateData.pinCode = pinCode;
+    if (line1) updateData.line1 = line1;
+    if (line2) updateData.line2 = line2;
+    if (city) updateData.city = city;
+    if (state) updateData.state = state;
+    if (country) updateData.country = country;
+    if (isDefaultDelivery !== undefined)
+      updateData.isDefaultDelivery = isDefaultDelivery;
 
-    if (isDefaultDelivery) {
-      user.addresses.forEach((addr) => (addr.isDefaultDelivery = false));
-      address.isDefaultDelivery = true;
-    }
+    await User.updateAddress(userId, recordId, updateData);
+    const updatedUser = await User.findOne({ recordId: userId });
+    const updatedAddress = updatedUser.addresses.find(
+      (addr) => addr.recordId === recordId
+    );
 
-    await user.save();
-
-    return successResponse(res, "Address updated successfully", address);
+    return successResponse(res, "Address updated successfully", updatedAddress);
   } catch (err) {
     console.error("UpdateAddress Error:", err);
     return errorResponse(res, "Failed to update address", 500);
@@ -194,16 +195,17 @@ export const deleteAddress = async (req, res) => {
     const user = await User.findOne({ recordId: userId });
     if (!user) return errorResponse(res, "User not found", 404);
 
-    const addressIndex = user.addresses.findIndex(
-      (addr) => addr.recordId === recordId
+    const address = user.addresses.find((addr) => addr.recordId === recordId);
+    if (!address) return errorResponse(res, "Address not found", 404);
+
+    await User.deleteAddress(userId, recordId);
+    const updatedUser = await User.findOne({ recordId: userId });
+
+    return successResponse(
+      res,
+      "Address deleted successfully",
+      updatedUser.addresses
     );
-    if (addressIndex === -1)
-      return errorResponse(res, "Address not found", 404);
-
-    user.addresses.splice(addressIndex, 1);
-    await user.save();
-
-    return successResponse(res, "Address deleted successfully", user.addresses);
   } catch (err) {
     console.error("DeleteAddress Error:", err);
     return errorResponse(res, "Failed to delete address", 500);

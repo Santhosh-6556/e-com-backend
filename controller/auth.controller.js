@@ -80,11 +80,15 @@ export const login = async (c) => {
     const otp = generateOTP();
     const otpExpires = new Date(Date.now() + 3 * 60 * 1000);
 
-    user.otp = otp;
-    user.otpExpires = otpExpires;
-    user.otpLastSent = new Date();
-    user.otpAttempts = 0;
-    await user.save();
+    await User.updateOne(
+      { recordId: user.recordId },
+      {
+        otp,
+        otpExpires,
+        otpLastSent: new Date(),
+        otpAttempts: 0,
+      }
+    );
 
     try {
       await sendEmail(email, otp);
@@ -135,11 +139,15 @@ export const resendOTP = async (c) => {
     const otp = generateOTP();
     const otpExpires = new Date(Date.now() + 3 * 60 * 1000);
 
-    user.otp = otp;
-    user.otpExpires = otpExpires;
-    user.otpLastSent = new Date();
-    user.otpAttempts = 0;
-    await user.save();
+    await User.updateOne(
+      { recordId: user.recordId },
+      {
+        otp,
+        otpExpires,
+        otpLastSent: new Date(),
+        otpAttempts: 0,
+      }
+    );
 
     try {
       await sendEmail(email, otp);
@@ -192,8 +200,14 @@ export const verifyOTP = async (c) => {
     }
 
     if (user.otp !== otp) {
-      user.otpAttempts = (user.otpAttempts || 0) + 1;
-      await user.save();
+      const newAttempts = (user.otpAttempts || 0) + 1;
+      await User.updateOne(
+        { recordId: user.recordId },
+        {
+          otpAttempts: newAttempts,
+        }
+      );
+      user.otpAttempts = newAttempts;
 
       const remainingAttempts = MAX_OTP_ATTEMPTS - user.otpAttempts;
       return errorResponse(
@@ -203,11 +217,15 @@ export const verifyOTP = async (c) => {
       );
     }
 
-    user.otp = undefined;
-    user.otpExpires = undefined;
-    user.otpLastSent = undefined;
-    user.otpAttempts = 0;
-    await user.save();
+    await User.updateOne(
+      { recordId: user.recordId },
+      {
+        otp: null,
+        otpExpires: null,
+        otpLastSent: null,
+        otpAttempts: 0,
+      }
+    );
 
     const token = generateToken({
       email: user.email,
@@ -219,7 +237,7 @@ export const verifyOTP = async (c) => {
       jwtToken: token,
       user: {
         recordId: user.recordId,
-        id: user._id,
+        id: user.recordId,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -272,7 +290,7 @@ export const adminLogin = async (c) => {
       jwtToken: token,
       user: {
         recordId: adminUser.recordId,
-        id: adminUser._id,
+        id: adminUser.recordId,
         name: adminUser.name,
         email: adminUser.email,
         role: adminUser.role,

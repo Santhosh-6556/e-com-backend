@@ -1,52 +1,99 @@
-import mongoose from "mongoose";
-import Product from "../models/addproduct.model.js";
-import Tax from "../models/tax.model.js";
+// Cart model for D1 database
+import { getD1 } from "../config/d1.js";
+import Product from "./product.model.js";
+import Tax from "./tax.model.js";
 
+const parseJSON = (value) => {
+  if (!value) return null;
+  try {
+    return typeof value === "string" ? JSON.parse(value) : value;
+  } catch {
+    return value;
+  }
+};
 
-const cartItemSchema = new mongoose.Schema(
-  {
-    productId: { type: String, required: true },
-    quantity: { type: Number, required: true, min: 1, default: 1 },
-    basePrice: { type: Number },     
-    totalPrice: { type: Number },     
-    discount: { type: Number, default: 0 },
-    itemTax: { type: Number, default: 0 },
-  },
-  { _id: true }
-);
+const stringifyJSON = (value) => {
+  if (value === null || value === undefined) return null;
+  return typeof value === "string" ? value : JSON.stringify(value);
+};
 
+const rowToCart = async (row) => {
+  if (!row) return null;
 
-const cartSchema = new mongoose.Schema({
-  recordId: { type: String, required: true, unique: true },
-  userId: { type: String, required: true, index: true },
-  items: [cartItemSchema],
-  itemsCount: { type: Number, default: 0 },
-  subtotal: { type: Number, default: 0 },
-  discount: { type: Number, default: 0 },
-  tax: { type: Number, default: 0 },
-  total: { type: Number, default: 0 },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
-});
+  // Get cart items
+  const db = getD1();
+  const items = await db.find("cart_items", { cartRecordId: row.recordId });
 
+  const cartItems = items.map((item) => ({
+    id: item.id,
+    productId: item.productId,
+    quantity: item.quantity,
+    basePrice: item.basePrice,
+    totalPrice: item.totalPrice,
+    discount: item.discount || 0,
+    itemTax: item.itemTax || 0,
+  }));
 
-cartSchema.pre("save", async function (next) {
-  this.itemsCount = this.items.reduce((sum, item) => sum + item.quantity, 0);
-  this.subtotal = 0;
-  this.discount = 0;
-  this.tax = 0;
+  return {
+    recordId: row.recordId,
+    userId: row.userId,
+    items: cartItems,
+    itemsCount: row.itemsCount || 0,
+    subtotal: row.subtotal || 0,
+    discount: row.discount || 0,
+    tax: row.tax || 0,
+    total: row.total || 0,
+    createdAt: row.createdAt ? new Date(row.createdAt * 1000) : new Date(),
+    updatedAt: row.updatedAt ? new Date(row.updatedAt * 1000) : new Date(),
+  };
+};
 
-  for (let item of this.items) {
-    const product = await Product.findOne({ recordId: item.productId });
-    if (!product) continue;
+class CartModel {
+  constructor() {
+    this.db = getD1();
+  }
+
+  async findOne(filter) {
+    const cart = await this.db.findOne("carts", filter);
+    if (!cart) return null;
+    return rowToCart(cart);
+  }
+
+  async find(filter = {}, options = {}) {
+    const carts = await this.db.find("carts", filter, options);
+    const results = [];
+    for (const cart of carts) {
+      results.push(await rowToCart(cart));
+    }
+    return results;
+  }
+
+  async create(data) {
+    const now = Math.floor(Date.now() / 1000);
+    const cartData = {
+      recordId: data.recordId,
+      userId: data.userId,
+      itemsCount: 0,
+      subtotal: 0,
+      discount: 0,
+      tax: 0,
+      total: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.db.insertOne("carts", cartData);
+    return this.findOne({ recordId: data.recordId });
+  }
+
+  async addItem(cartRecordId, itemData) {
+    // Calculate prices
+    const product = await Product.findOne({ recordId: itemData.productId });
+    if (!product) throw new Error("Product not found");
 
     const basePrice = product.discountPrice || product.price;
-    const originalTotal = product.price * item.quantity;
-    const sellingTotal = basePrice * item.quantity;
-
-    item.basePrice = basePrice;
-    item.totalPrice = sellingTotal;
-    item.discount = originalTotal - sellingTotal;
+    const originalTotal = product.price * itemData.quantity;
+    const sellingTotal = basePrice * itemData.quantity;
+    const discount = originalTotal - sellingTotal;
 
     let taxRate = 0;
     if (product.tax?.recordId) {
@@ -56,17 +103,155 @@ cartSchema.pre("save", async function (next) {
       });
       if (taxDoc && taxDoc.rate) taxRate = parseFloat(taxDoc.rate);
     }
+    const itemTax = (sellingTotal * taxRate) / 100;
 
-    item.itemTax = (item.totalPrice * taxRate) / 100;
+    const cartItem = {
+      cartRecordId,
+      productId: itemData.productId,
+      quantity: itemData.quantity,
+      basePrice,
+      totalPrice: sellingTotal,
+      discount,
+      itemTax,
+    };
+    await this.db.insertOne("cart_items", cartItem);
 
-    this.subtotal += item.totalPrice;
-    this.discount += item.discount;
-    this.tax += item.itemTax;
+    // Recalculate cart totals
+    await this.recalculateTotals(cartRecordId);
+    return this.findOne({ recordId: cartRecordId });
   }
 
-  this.total = this.subtotal + this.tax;
-  this.updatedAt = new Date();
-  next();
-});
+  async updateItem(cartRecordId, itemId, update) {
+    if (update.quantity !== undefined) {
+      const item = await this.db.findOne("cart_items", {
+        id: itemId,
+        cartRecordId,
+      });
+      if (!item) throw new Error("Cart item not found");
 
-export default mongoose.model("Cart", cartSchema);
+      const product = await Product.findOne({ recordId: item.productId });
+      if (!product) throw new Error("Product not found");
+
+      const basePrice = product.discountPrice || product.price;
+      const originalTotal = product.price * update.quantity;
+      const sellingTotal = basePrice * update.quantity;
+      const discount = originalTotal - sellingTotal;
+
+      let taxRate = 0;
+      if (product.tax?.recordId) {
+        const taxDoc = await Tax.findOne({
+          recordId: product.tax.recordId,
+          status: true,
+        });
+        if (taxDoc && taxDoc.rate) taxRate = parseFloat(taxDoc.rate);
+      }
+      const itemTax = (sellingTotal * taxRate) / 100;
+
+      await this.db.updateOne(
+        "cart_items",
+        { id: itemId, cartRecordId },
+        {
+          quantity: update.quantity,
+          basePrice,
+          totalPrice: sellingTotal,
+          discount,
+          itemTax,
+        }
+      );
+    }
+
+    await this.recalculateTotals(cartRecordId);
+    return this.findOne({ recordId: cartRecordId });
+  }
+
+  async removeItem(cartRecordId, itemId) {
+    await this.db.deleteOne("cart_items", { id: itemId, cartRecordId });
+    await this.recalculateTotals(cartRecordId);
+    return this.findOne({ recordId: cartRecordId });
+  }
+
+  async recalculateTotals(cartRecordId) {
+    const items = await this.db.find("cart_items", { cartRecordId });
+
+    let itemsCount = 0;
+    let subtotal = 0;
+    let discount = 0;
+    let tax = 0;
+
+    for (const item of items) {
+      itemsCount += item.quantity;
+      subtotal += item.totalPrice || 0;
+      discount += item.discount || 0;
+      tax += item.itemTax || 0;
+    }
+
+    const total = subtotal + tax;
+    const now = Math.floor(Date.now() / 1000);
+
+    await this.db.updateOne(
+      "carts",
+      { recordId: cartRecordId },
+      {
+        itemsCount,
+        subtotal,
+        discount,
+        tax,
+        total,
+        updatedAt: now,
+      }
+    );
+  }
+
+  async updateOne(filter, update) {
+    const updateData = { ...update, updatedAt: Math.floor(Date.now() / 1000) };
+    await this.db.updateOne("carts", filter, updateData);
+    return this.findOne(filter);
+  }
+
+  async deleteOne(filter) {
+    // Delete cart items first
+    const cart = await this.db.findOne("carts", filter);
+    if (cart) {
+      await this.db.deleteMany("cart_items", { cartRecordId: cart.recordId });
+    }
+    await this.db.deleteOne("carts", filter);
+    return true;
+  }
+}
+
+let cartModelInstance = null;
+
+export default {
+  findOne: async (filter) => {
+    if (!cartModelInstance) cartModelInstance = new CartModel();
+    return cartModelInstance.findOne(filter);
+  },
+  find: async (filter, options) => {
+    if (!cartModelInstance) cartModelInstance = new CartModel();
+    return cartModelInstance.find(filter, options);
+  },
+  create: async (data) => {
+    if (!cartModelInstance) cartModelInstance = new CartModel();
+    return cartModelInstance.create(data);
+  },
+  addItem: async (cartRecordId, itemData) => {
+    if (!cartModelInstance) cartModelInstance = new CartModel();
+    return cartModelInstance.addItem(cartRecordId, itemData);
+  },
+  updateItem: async (cartRecordId, itemId, update) => {
+    if (!cartModelInstance) cartModelInstance = new CartModel();
+    return cartModelInstance.updateItem(cartRecordId, itemId, update);
+  },
+  removeItem: async (cartRecordId, itemId) => {
+    if (!cartModelInstance) cartModelInstance = new CartModel();
+    return cartModelInstance.removeItem(cartRecordId, itemId);
+  },
+  updateOne: async (filter, update) => {
+    if (!cartModelInstance) cartModelInstance = new CartModel();
+    return cartModelInstance.updateOne(filter, update);
+  },
+  deleteOne: async (filter) => {
+    if (!cartModelInstance) cartModelInstance = new CartModel();
+    return cartModelInstance.deleteOne(filter);
+  },
+};

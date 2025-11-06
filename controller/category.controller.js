@@ -124,11 +124,20 @@ export const editCategory = async (req, res) => {
       category.displayPriority = displayPriority;
 
     category.lastModified = Date.now();
-    category.modifiedBy = req.user?.email || "system";
+    const updatedCategory = await Category.updateOne(
+      { recordId: categoryId },
+      {
+        ...updates,
+        modifiedBy: req.user?.email || "system",
+        lastModified: Math.floor(Date.now() / 1000),
+      }
+    );
 
-    await category.save();
-
-    return successResponse(res, "Category updated successfully", category);
+    return successResponse(
+      res,
+      "Category updated successfully",
+      updatedCategory
+    );
   } catch (error) {
     console.error("Edit Category Error:", error);
     return errorResponse(res, "Failed to update category", 500);
@@ -141,7 +150,10 @@ export const deleteCategory = async (req, res) => {
 
     if (!recordId) return errorResponse(res, "recordId is required", 400);
 
-    const deleted = await Category.findOneAndDelete({ recordId });
+    const category = await Category.findOne({ recordId });
+    if (!category) return errorResponse(res, "Category not found", 404);
+    await Category.deleteOne({ recordId });
+    const deleted = category;
     if (!deleted) return errorResponse(res, "Category not found", 404);
 
     return successResponse(res, "Category deleted successfully", deleted);
