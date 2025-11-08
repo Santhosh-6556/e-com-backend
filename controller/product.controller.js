@@ -52,59 +52,54 @@ export const editProduct = async (req, res) => {
       return errorResponse(res, "Product not found", 404);
     }
 
-    if ("brand" in updates) {
-      if (updates.brand === null) {
-        product.brand = null;
-      } else if (updates.brand?.recordId) {
-        const brand = await Brand.findOne({ recordId: updates.brand.recordId });
-        if (!brand) return errorResponse(res, "Invalid brand recordId", 400);
-        product.brand = {
-          recordId: brand.recordId,
-          identifier: brand.identifier,
-        };
-      }
-    }
-    if ("tax" in updates) {
-      if (updates.tax === null) {
-        product.tax = null;
-      } else if (updates.tax?.recordId) {
-        const tax = await Tax.findOne({ recordId: updates.tax.recordId });
-        if (!tax) return errorResponse(res, "Invalid tax recordId", 400);
-        product.tax = { recordId: tax.recordId, identifier: tax.identifier };
-      }
-    }
+   if ("brand" in updates) {
+  if (updates.brand === null) {
+    updates.brandRecordId = null;
+    updates.brandIdentifier = null;
+  } else if (updates.brand?.recordId) {
+    const brand = await Brand.findOne({ recordId: updates.brand.recordId });
+    if (!brand) return errorResponse(res, "Invalid brand recordId", 400);
+    updates.brandRecordId = brand.recordId;
+    updates.brandIdentifier = brand.identifier;
+  }
+}
 
-    if ("subcategory" in updates) {
-      if (updates.subcategory === null) {
-        product.subcategory = null;
-      } else if (updates.subcategory?.recordId) {
-        const subCat = await Category.findOne({
-          recordId: updates.subcategory.recordId,
-        });
-        if (!subCat)
-          return errorResponse(res, "Invalid subcategory recordId", 400);
-        product.subcategory = {
-          recordId: subCat.recordId,
-          identifier: subCat.identifier,
-        };
-      }
-    }
+if ("tax" in updates) {
+  if (updates.tax === null) {
+    updates.taxRecordId = null;
+    updates.taxIdentifier = null;
+  } else if (updates.tax?.recordId) {
+    const tax = await Tax.findOne({ recordId: updates.tax.recordId });
+    if (!tax) return errorResponse(res, "Invalid tax recordId", 400);
+    updates.taxRecordId = tax.recordId;
+    updates.taxIdentifier = tax.identifier;
+  }
+}
 
-    if ("category" in updates) {
-      if (updates.category === null) {
-        product.category = null;
-      } else if (updates.category?.recordId) {
-        const category = await Category.findOne({
-          recordId: updates.category.recordId,
-        });
-        if (!category)
-          return errorResponse(res, "Invalid category recordId", 400);
-        product.category = {
-          recordId: category.recordId,
-          identifier: category.identifier,
-        };
-      }
-    }
+if ("subcategory" in updates) {
+  if (updates.subcategory === null) {
+    updates.subcategoryRecordId = null;
+    updates.subcategoryIdentifier = null;
+  } else if (updates.subcategory?.recordId) {
+    const sub = await Category.findOne({ recordId: updates.subcategory.recordId });
+    if (!sub) return errorResponse(res, "Invalid subcategory recordId", 400);
+    updates.subcategoryRecordId = sub.recordId;
+    updates.subcategoryIdentifier = sub.identifier;
+  }
+}
+
+if ("category" in updates) {
+  if (updates.category === null) {
+    updates.categoryRecordId = null;
+    updates.categoryIdentifier = null;
+  } else if (updates.category?.recordId) {
+    const cat = await Category.findOne({ recordId: updates.category.recordId });
+    if (!cat) return errorResponse(res, "Invalid category recordId", 400);
+    updates.categoryRecordId = cat.recordId;
+    updates.categoryIdentifier = cat.identifier;
+  }
+}
+
 
     if ("ratings" in updates) {
       product.ratings = updates.ratings ?? { average: 0, count: 0 };
@@ -172,7 +167,7 @@ export const editProduct = async (req, res) => {
     };
 
     const updatedProduct = await Product.updateOne(
-      { recordId: productId },
+      { recordId },
       updateData
     );
 

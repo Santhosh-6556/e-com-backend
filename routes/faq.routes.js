@@ -15,7 +15,7 @@ router.use("*", authMiddleware(["user", "admin"]));
 router.post("/faq/add", expressToHono(addFAQ));
 router.post("/faq/edit", expressToHono(editFAQ));
 router.post("/faq/delete", expressToHono(deleteFAQ));
-router.get("/fqa", expressToHono(getAllFAQs));
+router.get("/faq", expressToHono(getAllFAQs));
 router.post("/faq/getedit", expressToHono(getFAQByRecordId));
 
 export default router;

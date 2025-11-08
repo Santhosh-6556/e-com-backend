@@ -90,8 +90,31 @@ export const editCategory = async (req, res) => {
       return errorResponse(res, "Category not found", 404);
     }
 
+    // Prepare update object
+    const updates = {};
+
+    if (identifier !== undefined) updates.identifier = identifier;
+    if (name !== undefined) updates.name = name;
+    if (shortDescription !== undefined)
+      updates.shortDescription = shortDescription;
+    if (status !== undefined) updates.status = status;
+    if (displayPriority !== undefined)
+      updates.displayPriority = displayPriority;
+
+    // Handle image upload (optional)
+    if (typeof image === "string") {
+      updates.image = image.startsWith("http")
+        ? image
+        : await uploadImage(image, req.env);
+    }
+
+    // Handle parent category reference
     if (parentCategory === null) {
-      category.parentCategory = null;
+      updates.parentCategoryRecordId = null;
+      updates.parentCategoryIdentifier = null;
+      updates.parentCategoryName = null;
+      updates.parentCategoryShortDescription = null;
+      updates.parentCategoryImage = null;
     } else if (parentCategory?.recordId) {
       const parent = await Category.findOne({
         recordId: parentCategory.recordId,
@@ -100,49 +123,26 @@ export const editCategory = async (req, res) => {
         return errorResponse(res, "Parent category not found", 404);
       }
 
-      category.parentCategory = {
-        recordId: parent.recordId,
-        identifier: parent.identifier,
-        name: parent.name,
-        shortDescription: parent.shortDescription,
-        image: parent.image,
-      };
+      updates.parentCategoryRecordId = parent.recordId;
+      updates.parentCategoryIdentifier = parent.identifier;
+      updates.parentCategoryName = parent.name;
+      updates.parentCategoryShortDescription = parent.shortDescription;
+      updates.parentCategoryImage = parent.image;
     }
 
-    if (typeof image === "string") {
-      category.image = image.startsWith("http")
-        ? image
-        : await uploadImage(image, req.env);
-    }
+    // Timestamps
+    updates.lastModified = Math.floor(Date.now() / 1000);
+  
 
-    if (identifier !== undefined) category.identifier = identifier;
-    if (name !== undefined) category.name = name;
-    if (shortDescription !== undefined)
-      category.shortDescription = shortDescription;
-    if (status !== undefined) category.status = status;
-    if (displayPriority !== undefined)
-      category.displayPriority = displayPriority;
+    const updated = await Category.updateOne({ recordId }, updates);
 
-    category.lastModified = Date.now();
-    const updatedCategory = await Category.updateOne(
-      { recordId: categoryId },
-      {
-        ...updates,
-        modifiedBy: req.user?.email || "system",
-        lastModified: Math.floor(Date.now() / 1000),
-      }
-    );
-
-    return successResponse(
-      res,
-      "Category updated successfully",
-      updatedCategory
-    );
+    return successResponse(res, "Category updated successfully", updated);
   } catch (error) {
     console.error("Edit Category Error:", error);
     return errorResponse(res, "Failed to update category", 500);
   }
 };
+
 
 export const deleteCategory = async (req, res) => {
   try {
