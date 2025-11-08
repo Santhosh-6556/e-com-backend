@@ -87,10 +87,11 @@ CREATE TABLE IF NOT EXISTS taxes (
     recordId TEXT UNIQUE NOT NULL,
     identifier TEXT NOT NULL,
     rate TEXT,
-    status INTEGER DEFAULT 1
+    status INTEGER DEFAULT 1,
     creationTime INTEGER DEFAULT (strftime('%s', 'now')),
     lastModified INTEGER DEFAULT (strftime('%s', 'now'))
 );
+
 
 CREATE INDEX IF NOT EXISTS idx_taxes_recordId ON taxes(recordId);
 
