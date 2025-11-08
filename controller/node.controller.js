@@ -134,34 +134,38 @@ export const editNode = async (req, res) => {
       displayPriority,
       shortDescription,
       identifier,
+      name,
+      status
     } = req.body;
 
-    // Require recordId instead of identifier
+    // Require recordId
     if (!recordId) {
       return errorResponse(res, "recordId is required to edit node", 400);
     }
 
-    // Find node by recordId
+    // Find node
     const node = await Node.findOne({ recordId });
     if (!node) {
       return errorResponse(res, "Node not found", 404);
     }
 
-    // Update fields
+    // Update basic fields
     node.path = path ?? node.path;
     node.identifier = identifier ?? node.identifier;
     node.displayPriority = displayPriority ?? node.displayPriority;
     node.shortDescription = shortDescription ?? node.shortDescription;
+    node.name = name ?? node.name;
+    node.status = status ?? node.status;
 
     // Handle parentNode properly
     if (parentNode === null) {
-      node.parentNode = null; // clear existing parent
+      node.parentNode = null;
     } else if (parentNode?.recordId) {
-      // re-fetch parent from DB
       const parent = await Node.findOne({ recordId: parentNode.recordId });
       if (!parent) {
         return errorResponse(res, "Parent node not found", 404);
       }
+
       node.parentNode = {
         path: parent.path,
         name: parent.name,
@@ -170,15 +174,15 @@ export const editNode = async (req, res) => {
         identifier: parent.identifier,
       };
     }
-    // if parentNode is undefined → leave as is
 
+    // Update audit fields
+    node.modifiedBy = req.user?.email || "unknown";
+    node.lastModified = Math.floor(Date.now() / 1000);
+
+    // Save changes
     const updatedNode = await Node.updateOne(
-      { recordId: nodeId },
-      {
-        ...updates,
-        modifiedBy: req.user?.email || "unknown",
-        lastModified: Math.floor(Date.now() / 1000),
-      }
+      { recordId },
+      node
     );
 
     return successResponse(res, "Node updated successfully", updatedNode);
@@ -187,6 +191,7 @@ export const editNode = async (req, res) => {
     return errorResponse(res, "Failed to update node", 500);
   }
 };
+
 
 export const deleteNode = async (req, res) => {
   try {

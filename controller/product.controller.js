@@ -319,7 +319,7 @@ export const Products = async (req, res) => {
       {},
       {
         sort: {
-          displayPriority: 1,
+        
           creationTime: -1,
         },
       }
