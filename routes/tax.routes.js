@@ -11,7 +11,7 @@ import { authMiddleware } from "../middleware/auth.middleware.js";
 import { expressToHono } from "../utils/hono-adapter.js";
 
 const router = new Hono();
-router.use("*",);
+router.use("*", authMiddleware(["user", "admin"]));
 
 router.post("/tax/add", expressToHono(addTax));
 router.post("/tax/edit", expressToHono(editTax));
