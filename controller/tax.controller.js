@@ -9,15 +9,11 @@ export const addTax = async (req, res) => {
   try {
     const { identifier, rate } = req.body;
 
-    if (!identifier) {
-      return errorResponse(res, "Identifier is required", 400);
-    }
+    if (!identifier) return errorResponse(res, "Identifier is required", 400);
 
     // Check duplicate identifier
     const existing = await Tax.findOne({ identifier });
-    if (existing) {
-      return errorResponse(res, "Identifier already exists", 400);
-    }
+    if (existing) return errorResponse(res, "Identifier already exists", 400);
 
     const newTax = await Tax.create({
       recordId: generateRecordId(),
@@ -40,23 +36,22 @@ export const editTax = async (req, res) => {
   try {
     const { recordId, identifier, rate, status } = req.body;
 
-    if (!recordId) {
-      return errorResponse(res, "recordId is required to edit Tax", 400);
-    }
+    if (!recordId) return errorResponse(res, "recordId is required", 400);
 
     const tax = await Tax.findOne({ recordId });
-    if (!tax) {
-      return errorResponse(res, "Tax not found", 404);
-    }
+    if (!tax) return errorResponse(res, "Tax not found", 404);
 
-    tax.identifier = identifier ?? tax.identifier;
-    tax.rate = rate ?? tax.rate;
-    tax.status = status ?? tax.status;
-    tax.lastModified = Date.now();
+    const updatedTax = await Tax.updateOne(
+      { recordId },
+      {
+        identifier: identifier ?? tax.identifier,
+        rate: rate ?? tax.rate,
+        status: status ?? tax.status,
+        lastModified: Date.now(),
+      }
+    );
 
-    await tax.save();
-
-    return successResponse(res, "Tax updated successfully", tax);
+    return successResponse(res, "Tax updated successfully", updatedTax);
   } catch (error) {
     console.error("Edit Tax Error:", error);
     return errorResponse(res, "Failed to update Tax", 500);
@@ -67,30 +62,29 @@ export const editTax = async (req, res) => {
 export const deleteTax = async (req, res) => {
   try {
     const { recordId } = req.body;
-
     if (!recordId) return errorResponse(res, "recordId is required", 400);
 
-    const deleted = await Tax.findOneAndDelete({ recordId });
-    if (!deleted) return errorResponse(res, "Tax not found", 404);
+    const tax = await Tax.findOne({ recordId });
+    if (!tax) return errorResponse(res, "Tax not found", 404);
 
-    return successResponse(res, "Tax deleted successfully", deleted);
+    await Tax.deleteOne({ recordId });
+    return successResponse(res, "Tax deleted successfully", tax);
   } catch (error) {
     console.error("Delete Tax Error:", error);
     return errorResponse(res, "Failed to delete Tax", 500);
   }
 };
 
-// ✅ Get All Taxes
 export const getAllTaxes = async (req, res) => {
   try {
-    const taxes = await Tax.find().sort({ creationTime: -1 });
-
+    const taxes = await Tax.find({}, { sort: { creationTime: -1 } });
     return successResponse(res, "Taxes fetched successfully", taxes);
   } catch (error) {
     console.error("Get All Taxes Error:", error);
     return errorResponse(res, "Failed to fetch taxes", 500);
   }
 };
+
 
 // ✅ Get Tax by recordId
 export const getTaxByRecordId = async (req, res) => {
@@ -108,12 +102,13 @@ export const getTaxByRecordId = async (req, res) => {
   }
 };
 
+// ✅ Lightweight endpoint (no sorting)
 export const getTaxes = async (req, res) => {
   try {
-    const taxes = await Tax.find();
-    return successResponse(res, "Taxes fetched successfully", taxes);
+    const taxes = await Tax.query("SELECT * FROM taxes;");
+    return successResponse(res, "Taxes fetched successfully", taxes.results || taxes);
   } catch (error) {
-    console.error("Get All Taxes Error:", error);
+    console.error("Get Taxes Error:", error);
     return errorResponse(res, "Failed to fetch taxes", 500);
   }
 };

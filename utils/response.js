@@ -1,15 +1,26 @@
-export const successResponse = (res, message, data = {}) => {
-    return res.status(200).json({
-      success: true,
-      message,
-      data,
-    });
+export const successResponse = (cOrRes, message, data = {}) => {
+  const response = {
+    success: true,
+    message,
+    data,
   };
-  
-  export const errorResponse = (res, message, statusCode = 400) => {
-    return res.status(statusCode).json({
-      success: false,
-      message,
-    });
+
+  if (typeof cOrRes.json === "function" && typeof cOrRes.req !== "undefined") {
+    return cOrRes.json(response, 200);
+  }
+
+  return cOrRes.status(200).json(response);
+};
+
+export const errorResponse = (cOrRes, message, statusCode = 400) => {
+  const response = {
+    success: false,
+    message,
   };
-  
+
+  if (typeof cOrRes.json === "function" && typeof cOrRes.req !== "undefined") {
+    return cOrRes.json(response, statusCode);
+  }
+
+  return cOrRes.status(statusCode).json(response);
+};

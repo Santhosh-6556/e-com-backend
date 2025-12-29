@@ -1,5 +1,4 @@
-import mongoose from "mongoose";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import Order from "../models/order.model.js";
 import Cart from "../models/cart.model.js";
 import Product from "../models/addproduct.model.js";
@@ -13,75 +12,81 @@ const getRazorpayInstance = () => {
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
     throw new Error("Razorpay credentials not configured");
   }
-  
+
   return new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
   });
 };
 
 // Helper function to generate order ID
 const generateOrderId = () => {
-  return `ORD${Date.now()}${Math.random().toString(36).substr(2, 5)}`.toUpperCase();
+  return `ORD${Date.now()}${Math.random()
+    .toString(36)
+    .substr(2, 5)}`.toUpperCase();
 };
 
 // Create Order and Razorpay Order
 export const createOrder = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    const { 
-      userId, 
-      shippingAddress, 
+    const {
+      userId,
+      shippingAddress,
       paymentMethod,
-      saveAddress = false 
+      saveAddress = false,
     } = req.body;
 
     if (!userId || !shippingAddress) {
-      return errorResponse(res, "User ID and shipping address are required", 400);
+      return errorResponse(
+        res,
+        "User ID and shipping address are required",
+        400
+      );
     }
 
     // 1. Get user cart
-    const cart = await Cart.findOne({ userId }).session(session);
+    const cart = await Cart.findOne({ userId });
     if (!cart || cart.items.length === 0) {
       return errorResponse(res, "Cart is empty", 400);
     }
 
     // 2. Validate stock and prices
     for (let item of cart.items) {
-      const product = await Product.findOne({ recordId: item.productId }).session(session);
+      const product = await Product.findOne({
+        recordId: item.productId,
+      });
       if (!product) {
-        await session.abortTransaction();
         return errorResponse(res, `Product ${item.productId} not found`, 404);
       }
       if (product.stock < item.quantity) {
-        await session.abortTransaction();
-        return errorResponse(res, `Insufficient stock for ${product.identifier}`, 400);
+        return errorResponse(
+          res,
+          `Insufficient stock for ${product.identifier}`,
+          400
+        );
       }
     }
 
     // 3. Save address to user profile if requested (WITH DUPLICATE CHECK)
     if (saveAddress) {
-      const user = await User.findOne({ recordId: userId }).session(session);
+      const user = await User.findOne({ recordId: userId });
       if (!user) {
-        await session.abortTransaction();
         return errorResponse(res, "User not found", 404);
       }
 
       // Helper function to normalize addresses for comparison
       const normalizeAddress = (addr) => ({
-        line1: (addr.line1 || '').toLowerCase().trim(),
-        city: (addr.city || '').toLowerCase().trim(),
-        pinCode: (addr.pinCode || '').toString().trim(),
-        phone: (addr.phone || '').toString().trim(),
-        firstName: (addr.firstName || '').toLowerCase().trim(),
-        lastName: (addr.lastName || '').toLowerCase().trim()
+        line1: (addr.line1 || "").toLowerCase().trim(),
+        city: (addr.city || "").toLowerCase().trim(),
+        pinCode: (addr.pinCode || "").toString().trim(),
+        phone: (addr.phone || "").toString().trim(),
+        firstName: (addr.firstName || "").toLowerCase().trim(),
+        lastName: (addr.lastName || "").toLowerCase().trim(),
       });
 
       const normalizedNewAddress = normalizeAddress(shippingAddress);
-      
-      const addressExists = user.addresses.some(existingAddr => {
+
+      const addressExists = user.addresses.some((existingAddr) => {
         const normalizedExisting = normalizeAddress(existingAddr);
         return (
           normalizedExisting.line1 === normalizedNewAddress.line1 &&
@@ -93,21 +98,19 @@ export const createOrder = async (req, res) => {
 
       if (!addressExists) {
         const isFirstAddress = user.addresses.length === 0;
-        
+
         // If this is the first address or we want to make it default, remove default from others
         if (isFirstAddress) {
-          user.addresses.forEach(addr => {
+          user.addresses.forEach((addr) => {
             addr.isDefaultDelivery = false;
           });
         }
 
-        user.addresses.push({
+        await User.addAddress(userId, {
           ...shippingAddress,
           recordId: generateRecordId(),
-          isDefaultDelivery: isFirstAddress
+          isDefaultDelivery: isFirstAddress,
         });
-
-        await user.save({ session });
         console.log("New address saved to user profile");
       } else {
         console.log("Address already exists in user profile, skipping save");
@@ -121,7 +124,9 @@ export const createOrder = async (req, res) => {
 
     const orderItems = await Promise.all(
       cart.items.map(async (item) => {
-        const product = await Product.findOne({ recordId: item.productId }).session(session);
+        const product = await Product.findOne({
+          recordId: item.productId,
+        });
         return {
           productId: product.identifier,
           productRecordId: product.recordId,
@@ -131,13 +136,13 @@ export const createOrder = async (req, res) => {
           basePrice: item.basePrice,
           totalPrice: item.totalPrice,
           discount: item.discount,
-          tax: item.itemTax
+          tax: item.itemTax,
         };
       })
     );
 
     // 5. Create order with all required fields
-    const newOrder = new Order({
+    const newOrder = await Order.create({
       recordId: orderRecordId,
       orderId: orderId,
       userId,
@@ -151,17 +156,15 @@ export const createOrder = async (req, res) => {
       billingAddress: shippingAddress,
       orderStatus: "pending",
       deliveryMethod: "standard",
-      transactions: [{
-        recordId: transactionRecordId,
-        paymentMethod,
-        amount: cart.total,
-        status: paymentMethod === "cod" ? "pending" : "pending"
-      }],
-      createdAt: new Date(),
-      updatedAt: new Date()
+      transactions: [
+        {
+          recordId: transactionRecordId,
+          paymentMethod,
+          amount: cart.total,
+          status: paymentMethod === "cod" ? "pending" : "pending",
+        },
+      ],
     });
-
-    await newOrder.save({ session });
 
     let razorpayOrder = null;
 
@@ -169,80 +172,82 @@ export const createOrder = async (req, res) => {
     if (paymentMethod !== "cod") {
       try {
         const razorpayInstance = getRazorpayInstance();
-        
+
         const options = {
           amount: Math.round(cart.total * 100),
           currency: "INR",
           receipt: orderRecordId,
           notes: {
             userId,
-            orderRecordId: orderRecordId
-          }
+            orderRecordId: orderRecordId,
+          },
         };
 
         razorpayOrder = await razorpayInstance.orders.create(options);
-        
-        newOrder.transactions[0].razorpayOrderId = razorpayOrder.id;
-        await newOrder.save({ session });
-        
+
+        const updatedTransactions = [...newOrder.transactions];
+        updatedTransactions[0] = {
+          ...updatedTransactions[0],
+          razorpayOrderId: razorpayOrder.id,
+        };
+
+        await Order.updateOne(
+          { recordId: orderRecordId },
+          {
+            transactions: updatedTransactions,
+          }
+        );
+        newOrder.transactions = updatedTransactions;
       } catch (razorpayError) {
-        await session.abortTransaction();
         console.error("Razorpay order creation failed:", razorpayError);
-        return errorResponse(res, "Payment service unavailable. Please try COD or try again later.", 500);
+        return errorResponse(
+          res,
+          "Payment service unavailable. Please try COD or try again later.",
+          500
+        );
       }
     }
 
     // 7. If COD, reserve stock and clear cart
     if (paymentMethod === "cod") {
       for (let item of cart.items) {
-        await Product.findOneAndUpdate(
+        const product = await Product.findOne({ recordId: item.productId });
+        await Product.updateOne(
           { recordId: item.productId },
-          { $inc: { stock: -item.quantity } },
-          { session }
+          { stock: (product.stock || 0) - item.quantity }
         );
       }
-      cart.items = [];
-      await cart.save({ session });
+      await Cart.updateOne({ userId }, { items: [] });
     }
-
-    await session.commitTransaction();
 
     const response = {
       order: newOrder,
-      razorpayOrder: razorpayOrder || null
+      razorpayOrder: razorpayOrder || null,
     };
 
     return successResponse(res, "Order created successfully", response);
-
   } catch (error) {
-    await session.abortTransaction();
     console.error("Create Order Error:", error);
-    
-    if (error.name === 'ValidationError') {
-      console.error('Validation errors:', error.errors);
-    }
-    
     return errorResponse(res, "Failed to create order", 500);
-  } finally {
-    session.endSession();
   }
 };
 
 // Verify Razorpay Payment
 export const verifyPayment = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    const { 
-      razorpay_order_id, 
-      razorpay_payment_id, 
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
       razorpay_signature,
-      orderRecordId 
+      orderRecordId,
     } = req.body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return errorResponse(res, "Payment verification failed - missing parameters", 400);
+      return errorResponse(
+        res,
+        "Payment verification failed - missing parameters",
+        400
+      );
     }
 
     // Verify payment signature using crypto (ES module syntax)
@@ -252,50 +257,61 @@ export const verifyPayment = async (req, res) => {
       .digest("hex");
 
     if (expectedSignature !== razorpay_signature) {
-      return errorResponse(res, "Payment verification failed - invalid signature", 400);
+      return errorResponse(
+        res,
+        "Payment verification failed - invalid signature",
+        400
+      );
     }
 
     // Find order
-    const order = await Order.findOne({ recordId: orderRecordId }).session(session);
+    const order = await Order.findOne({ recordId: orderRecordId });
     if (!order) {
       return errorResponse(res, "Order not found", 404);
     }
 
     // Update order and transaction
-    order.orderStatus = "confirmed";
-    order.transactions[0].status = "success";
-    order.transactions[0].razorpayPaymentId = razorpay_payment_id;
-    order.transactions[0].razorpaySignature = razorpay_signature;
-    order.updatedAt = new Date();
+    const updatedTransactions = [...order.transactions];
+    updatedTransactions[0] = {
+      ...updatedTransactions[0],
+      status: "success",
+      razorpayPaymentId: razorpay_payment_id,
+      razorpaySignature: razorpay_signature,
+    };
 
-    await order.save({ session });
+    await Order.updateOne(
+      { recordId: orderRecordId },
+      {
+        orderStatus: "confirmed",
+        transactions: updatedTransactions,
+        updatedAt: Math.floor(Date.now() / 1000),
+      }
+    );
 
     // Clear cart and update stock (for online payments)
-    const cart = await Cart.findOne({ userId: order.userId }).session(session);
+    const cart = await Cart.findOne({ userId: order.userId });
     if (cart) {
       // Update stock
       for (let item of order.items) {
-        await Product.findOneAndUpdate(
+        const product = await Product.findOne({
+          recordId: item.productRecordId,
+        });
+        await Product.updateOne(
           { recordId: item.productRecordId },
-          { $inc: { stock: -item.quantity } },
-          { session }
+          { stock: (product.stock || 0) - item.quantity }
         );
       }
       // Clear cart
-      cart.items = [];
-      await cart.save({ session });
+      await Cart.updateOne({ userId: order.userId }, { items: [] });
     }
 
-    await session.commitTransaction();
-
-    return successResponse(res, "Payment verified successfully", { order });
-
+    const updatedOrder = await Order.findOne({ recordId: orderRecordId });
+    return successResponse(res, "Payment verified successfully", {
+      order: updatedOrder,
+    });
   } catch (error) {
-    await session.abortTransaction();
     console.error("Verify Payment Error:", error);
     return errorResponse(res, "Payment verification failed", 500);
-  } finally {
-    session.endSession();
   }
 };
 
@@ -307,12 +323,14 @@ export const getUserOrders = async (req, res) => {
       return errorResponse(res, "User ID is required", 400);
     }
 
-    const orders = await Order.find({ recordId })
-      .sort({ createdAt: -1 })
-      .lean();
+    const orders = await Order.find(
+      { userId: recordId },
+      {
+        sort: { createdAt: -1 },
+      }
+    );
 
     return successResponse(res, "Orders retrieved successfully", orders);
-
   } catch (error) {
     console.error("Get User Orders Error:", error);
     return errorResponse(res, "Failed to retrieve orders", 500);
@@ -327,39 +345,34 @@ export const getOrderDetails = async (req, res) => {
       return errorResponse(res, "Order ID and User ID are required", 400);
     }
 
-    const order = await Order.findOne({ 
-      recordId: orderRecordId, 
-      userId 
-    }).lean();
+    const order = await Order.findOne({
+      recordId: orderRecordId,
+      userId,
+    });
 
     if (!order) {
       return errorResponse(res, "Order not found", 404);
     }
 
     return successResponse(res, "Order details retrieved successfully", order);
-
   } catch (error) {
     console.error("Get Order Details Error:", error);
     return errorResponse(res, "Failed to retrieve order details", 500);
   }
 };
 
-
 // Cancel Order
 export const cancelOrder = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const { orderRecordId, userId, reason } = req.body;
     if (!orderRecordId || !userId) {
       return errorResponse(res, "Order ID and User ID are required", 400);
     }
 
-    const order = await Order.findOne({ 
-      recordId: orderRecordId, 
-      userId 
-    }).session(session);
+    const order = await Order.findOne({
+      recordId: orderRecordId,
+      userId,
+    });
 
     if (!order) {
       return errorResponse(res, "Order not found", 404);
@@ -372,49 +385,55 @@ export const cancelOrder = async (req, res) => {
 
     // Restore stock
     for (let item of order.items) {
-      await Product.findOneAndUpdate(
+      const product = await Product.findOne({
+        recordId: item.productRecordId,
+      });
+      await Product.updateOne(
         { recordId: item.productRecordId },
-        { $inc: { stock: item.quantity } },
-        { session }
+        { stock: (product.stock || 0) + item.quantity }
       );
     }
 
     // Update order status
-    order.orderStatus = "cancelled";
-    order.transactions[0].status = "refunded";
-    await order.save({ session });
+    const updatedTransactions = [...order.transactions];
+    updatedTransactions[0] = {
+      ...updatedTransactions[0],
+      status: "refunded",
+    };
 
-    await session.commitTransaction();
+    await Order.updateOne(
+      { recordId: orderRecordId },
+      {
+        orderStatus: "cancelled",
+        transactions: updatedTransactions,
+        updatedAt: Math.floor(Date.now() / 1000),
+      }
+    );
 
-    return successResponse(res, "Order cancelled successfully", order);
-
+    const updatedOrder = await Order.findOne({ recordId: orderRecordId });
+    return successResponse(res, "Order cancelled successfully", updatedOrder);
   } catch (error) {
-    await session.abortTransaction();
     console.error("Cancel Order Error:", error);
     return errorResponse(res, "Failed to cancel order", 500);
-  } finally {
-    session.endSession();
   }
 };
-
 
 export const getAllOrders = async (req, res) => {
   try {
     // Fetch all orders
-    const orders = await Order.find().sort({ creationTime: -1 });
+    const orders = await Order.find({}, { sort: { createdAt: -1 } });
 
     // Collect all user recordIds from orders
     const userRecordIds = orders.map((order) => order.userId);
 
     // Fetch corresponding users
-    const users = await User.find({ recordId: { $in: userRecordIds } })
-      .select("recordId name email phone addresses");
+    const users = await User.find({ recordId: userRecordIds });
 
     // Merge user details into each order
     const mergedOrders = orders.map((order) => {
       const user = users.find((u) => u.recordId === order.userId);
       return {
-        ...order.toObject(),
+        ...order,
         userDetails: user || null,
       };
     });

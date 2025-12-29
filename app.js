@@ -1,13 +1,16 @@
-import express from "express";
-import cors from "cors";
+import "./polyfills.js";
+
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { serveStatic } from "@hono/node-server/serve-static";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import authRoutes from "./routes/auth.routes.js";
 import nodeRoutes from "./routes/node.routes.js";
 import productRoutes from "./routes/product.router.js";
 import categoryRoutes from "./routes/category.routes.js";
 import brandRoutes from "./routes/brand.routes.js";
 import wishlist from "./routes/wishlist.routes.js";
-import path from "path";
-import bodyParser from "body-parser";
 import banner from "./routes/banner.routes.js";
 import tax from "./routes/tax.routes.js";
 import publicRoutes from "./routes/public.routes.js";
@@ -16,35 +19,97 @@ import user from "./routes/user.routes.js";
 import faq from "./routes/faq.routes.js";
 import order from "./routes/order.routes.js";
 
-const app = express();
+const app = new Hono();
 
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
-app.use(bodyParser.json({ limit: "50mb" }));
-app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("*", async (c, next) => {
+  if (c.env) {
+    c.set("env", c.env);
+  }
+  await next();
+});
 
-app.use("/api/auth", authRoutes);
-app.use("/admin", nodeRoutes);
-app.use("/admin", productRoutes);
-app.use("/admin", categoryRoutes);
-app.use("/admin", brandRoutes);
-app.use("/admin", wishlist);
-app.use("/admin", banner);
-app.use("/admin", tax);
-app.use("/admin", faq);
-app.use("/api", publicRoutes);
-app.use("/admin", cart);
-app.use("/admin", user);
-app.use("/admin", order);
+app.use(
+  "*",
+  cors({
+    origin: "*",
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-app.get("/ping", (req, res) => {
-  res.send("pong");
+try {
+  if (
+    typeof process !== "undefined" &&
+    process.cwd &&
+    typeof process.cwd === "function"
+  ) {
+    const uploadsPath = path.join(process.cwd(), "uploads");
+    if (
+      existsSync &&
+      typeof existsSync === "function" &&
+      existsSync(uploadsPath)
+    ) {
+      app.use(
+        "/uploads/*",
+        serveStatic({
+          root: uploadsPath,
+        })
+      );
+    }
+  }
+} catch (error) {}
+
+app.route("/api/auth", authRoutes);
+app.route("/admin", nodeRoutes);
+app.route("/admin", productRoutes);
+app.route("/admin", categoryRoutes);
+app.route("/admin", brandRoutes);
+app.route("/admin", wishlist);
+app.route("/admin", banner);
+app.route("/admin", tax);
+app.route("/admin", faq);
+app.route("/api", publicRoutes);
+app.route("/admin", cart);
+app.route("/admin", user);
+app.route("/admin", order);
+
+app.get("/", (c) => {
+  return c.json({
+    success: true,
+    message: "E-commerce API is running",
+    version: "1.0.0",
+    endpoints: {
+      health: "/ping",
+      auth: "/api/auth",
+      public: {
+        banners: "/api/banners/all",
+        products: "/api/products/get",
+        categories: "/api/category/get",
+        faq: "/api/faq/all",
+      },
+      admin: "/admin",
+    },
+  });
+});
+
+app.get("/ping", (c) => {
+  return c.text("pong");
+});
+
+// 404 handler for unmatched routes
+app.notFound((c) => {
+  return c.json({
+    success: false,
+    message: "Route not found",
+    path: c.req.path,
+    method: c.req.method,
+    availableEndpoints: {
+      health: "/ping",
+      banners: "/api/banners/all",
+      products: "/api/products/get",
+      categories: "/api/category/get",
+    },
+  }, 404);
 });
 
 export default app;

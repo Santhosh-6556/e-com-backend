@@ -10,15 +10,17 @@ export const addProduct = async (req, res) => {
   try {
     const data = req.body;
 
-    const images = await Promise.all((data.images || []).map(uploadImage));
+    const images = await Promise.all(
+      (data.images || []).map((img) => uploadImage(img, req.env))
+    );
     const carouselImages = await Promise.all(
-      (data.carouselImages || []).map(uploadImage)
+      (data.carouselImages || []).map((img) => uploadImage(img, req.env))
     );
 
     const productDescription = await Promise.all(
       (data.productDescription || []).map(async (desc) => ({
         text: desc.text,
-        image: desc.image ? await uploadImage(desc.image) : null,
+        image: desc.image ? await uploadImage(desc.image, req.env) : null,
       }))
     );
 
@@ -50,59 +52,54 @@ export const editProduct = async (req, res) => {
       return errorResponse(res, "Product not found", 404);
     }
 
-    if ("brand" in updates) {
-      if (updates.brand === null) {
-        product.brand = null;
-      } else if (updates.brand?.recordId) {
-        const brand = await Brand.findOne({ recordId: updates.brand.recordId });
-        if (!brand) return errorResponse(res, "Invalid brand recordId", 400);
-        product.brand = {
-          recordId: brand.recordId,
-          identifier: brand.identifier,
-        };
-      }
-    }
-    if ("tax" in updates) {
-      if (updates.tax === null) {
-        product.tax = null;
-      } else if (updates.tax?.recordId) {
-        const tax = await Tax.findOne({ recordId: updates.tax.recordId });
-        if (!tax) return errorResponse(res, "Invalid tax recordId", 400);
-        product.tax = { recordId: tax.recordId, identifier: tax.identifier };
-      }
-    }
+   if ("brand" in updates) {
+  if (updates.brand === null) {
+    updates.brandRecordId = null;
+    updates.brandIdentifier = null;
+  } else if (updates.brand?.recordId) {
+    const brand = await Brand.findOne({ recordId: updates.brand.recordId });
+    if (!brand) return errorResponse(res, "Invalid brand recordId", 400);
+    updates.brandRecordId = brand.recordId;
+    updates.brandIdentifier = brand.identifier;
+  }
+}
 
-    if ("subcategory" in updates) {
-      if (updates.subcategory === null) {
-        product.subcategory = null;
-      } else if (updates.subcategory?.recordId) {
-        const subCat = await Category.findOne({
-          recordId: updates.subcategory.recordId,
-        });
-        if (!subCat)
-          return errorResponse(res, "Invalid subcategory recordId", 400);
-        product.subcategory = {
-          recordId: subCat.recordId,
-          identifier: subCat.identifier,
-        };
-      }
-    }
+if ("tax" in updates) {
+  if (updates.tax === null) {
+    updates.taxRecordId = null;
+    updates.taxIdentifier = null;
+  } else if (updates.tax?.recordId) {
+    const tax = await Tax.findOne({ recordId: updates.tax.recordId });
+    if (!tax) return errorResponse(res, "Invalid tax recordId", 400);
+    updates.taxRecordId = tax.recordId;
+    updates.taxIdentifier = tax.identifier;
+  }
+}
 
-    if ("category" in updates) {
-      if (updates.category === null) {
-        product.category = null;
-      } else if (updates.category?.recordId) {
-        const category = await Category.findOne({
-          recordId: updates.category.recordId,
-        });
-        if (!category)
-          return errorResponse(res, "Invalid category recordId", 400);
-        product.category = {
-          recordId: category.recordId,
-          identifier: category.identifier,
-        };
-      }
-    }
+if ("subcategory" in updates) {
+  if (updates.subcategory === null) {
+    updates.subcategoryRecordId = null;
+    updates.subcategoryIdentifier = null;
+  } else if (updates.subcategory?.recordId) {
+    const sub = await Category.findOne({ recordId: updates.subcategory.recordId });
+    if (!sub) return errorResponse(res, "Invalid subcategory recordId", 400);
+    updates.subcategoryRecordId = sub.recordId;
+    updates.subcategoryIdentifier = sub.identifier;
+  }
+}
+
+if ("category" in updates) {
+  if (updates.category === null) {
+    updates.categoryRecordId = null;
+    updates.categoryIdentifier = null;
+  } else if (updates.category?.recordId) {
+    const cat = await Category.findOne({ recordId: updates.category.recordId });
+    if (!cat) return errorResponse(res, "Invalid category recordId", 400);
+    updates.categoryRecordId = cat.recordId;
+    updates.categoryIdentifier = cat.identifier;
+  }
+}
+
 
     if ("ratings" in updates) {
       product.ratings = updates.ratings ?? { average: 0, count: 0 };
@@ -115,7 +112,7 @@ export const editProduct = async (req, res) => {
     if ("images" in updates) {
       product.images = await Promise.all(
         (updates.images || []).map(async (img) =>
-          img.startsWith("http") ? img : await uploadImage(img)
+          img.startsWith("http") ? img : await uploadImage(img, req.env)
         )
       );
     }
@@ -123,7 +120,7 @@ export const editProduct = async (req, res) => {
     if ("carouselImages" in updates) {
       product.carouselImages = await Promise.all(
         (updates.carouselImages || []).map(async (img) =>
-          img.startsWith("http") ? img : await uploadImage(img)
+          img.startsWith("http") ? img : await uploadImage(img, req.env)
         )
       );
     }
@@ -135,7 +132,7 @@ export const editProduct = async (req, res) => {
           image: desc.image
             ? desc.image.startsWith("http")
               ? desc.image
-              : await uploadImage(desc.image)
+              : await uploadImage(desc.image, req.env)
             : null,
         }))
       );
@@ -163,12 +160,18 @@ export const editProduct = async (req, res) => {
       }
     });
 
-    product.modifiedBy = req.user?.email || "system";
-    product.lastModified = Date.now();
+    const updateData = {
+      ...updates,
+      modifiedBy: req.user?.email || "system",
+      lastModified: Math.floor(Date.now() / 1000),
+    };
 
-    await product.save();
+    const updatedProduct = await Product.updateOne(
+      { recordId },
+      updateData
+    );
 
-    return successResponse(res, "Product updated successfully", product);
+    return successResponse(res, "Product updated successfully", updatedProduct);
   } catch (error) {
     console.error("EditProduct Error:", error);
     return errorResponse(res, "Failed to update product", 500);
@@ -182,7 +185,10 @@ export const deleteProduct = async (req, res) => {
       return errorResponse(res, "recordId is required", 400);
     }
 
-    const deleted = await Product.findOneAndDelete({ recordId });
+    const product = await Product.findOne({ recordId });
+    if (!product) return errorResponse(res, "Product not found", 404);
+    await Product.deleteOne({ recordId });
+    const deleted = product;
     if (!deleted) return errorResponse(res, "Product not found", 404);
 
     return successResponse(res, "Product deleted successfully", deleted);
@@ -195,7 +201,7 @@ export const deleteProduct = async (req, res) => {
 // ✅ View All Products
 export const getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find().sort({ creationTime: -1 });
+    const products = await Product.find({}, { sort: { creationTime: -1 } });
 
     return successResponse(res, "Products fetched successfully", products);
   } catch (error) {
@@ -260,32 +266,36 @@ export const getFilteredProducts = async (req, res) => {
     const query = {};
 
     if (category?.recordId) {
-      query["category.recordId"] = category.recordId;
+      query.categoryRecordId = category.recordId;
     }
 
     if (subcategory?.recordId) {
-      query["subcategory.recordId"] = subcategory.recordId;
+      query.subcategoryRecordId = subcategory.recordId;
     }
 
     if (brand?.recordId) {
-      query["brand.recordId"] = brand.recordId;
+      query.brandRecordId = brand.recordId;
     }
 
     if (minPrice !== undefined || maxPrice !== undefined) {
-      query.price = {};
-      if (minPrice !== undefined) query.price.$gte = minPrice;
-      if (maxPrice !== undefined) query.price.$lte = maxPrice;
+      if (minPrice !== undefined && maxPrice !== undefined) {
+        query.price = { $gte: minPrice, $lte: maxPrice };
+      } else if (minPrice !== undefined) {
+        query.price = { $gte: minPrice };
+      } else if (maxPrice !== undefined) {
+        query.price = { $lte: maxPrice };
+      }
     }
 
     if (minRating !== undefined) {
-      query["ratings.average"] = { $gte: minRating };
+      query.ratingsAverage = { $gte: minRating };
     }
 
     if (status !== undefined) {
       query.status = status;
     }
 
-    const products = await Product.find(query).sort({ creationTime: -1 });
+    const products = await Product.find(query, { sort: { creationTime: -1 } });
 
     return successResponse(
       res,
@@ -300,10 +310,15 @@ export const getFilteredProducts = async (req, res) => {
 
 export const Products = async (req, res) => {
   try {
-    const products = await Product.find().sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const products = await Product.find(
+      {},
+      {
+        sort: {
+        
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(res, "All products fetched successfully", products);
   } catch (error) {

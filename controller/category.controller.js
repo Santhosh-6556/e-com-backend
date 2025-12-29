@@ -44,7 +44,7 @@ export const addCategory = async (req, res) => {
     const uploadedImage = image
       ? image.startsWith("http")
         ? image
-        : await uploadImage(image)
+        : await uploadImage(image, req.env)
       : null;
 
     const newCategory = await Category.create({
@@ -90,8 +90,31 @@ export const editCategory = async (req, res) => {
       return errorResponse(res, "Category not found", 404);
     }
 
+    // Prepare update object
+    const updates = {};
+
+    if (identifier !== undefined) updates.identifier = identifier;
+    if (name !== undefined) updates.name = name;
+    if (shortDescription !== undefined)
+      updates.shortDescription = shortDescription;
+    if (status !== undefined) updates.status = status;
+    if (displayPriority !== undefined)
+      updates.displayPriority = displayPriority;
+
+    // Handle image upload (optional)
+    if (typeof image === "string") {
+      updates.image = image.startsWith("http")
+        ? image
+        : await uploadImage(image, req.env);
+    }
+
+    // Handle parent category reference
     if (parentCategory === null) {
-      category.parentCategory = null;
+      updates.parentCategoryRecordId = null;
+      updates.parentCategoryIdentifier = null;
+      updates.parentCategoryName = null;
+      updates.parentCategoryShortDescription = null;
+      updates.parentCategoryImage = null;
     } else if (parentCategory?.recordId) {
       const parent = await Category.findOne({
         recordId: parentCategory.recordId,
@@ -100,40 +123,26 @@ export const editCategory = async (req, res) => {
         return errorResponse(res, "Parent category not found", 404);
       }
 
-      category.parentCategory = {
-        recordId: parent.recordId,
-        identifier: parent.identifier,
-        name: parent.name,
-        shortDescription: parent.shortDescription,
-        image: parent.image,
-      };
+      updates.parentCategoryRecordId = parent.recordId;
+      updates.parentCategoryIdentifier = parent.identifier;
+      updates.parentCategoryName = parent.name;
+      updates.parentCategoryShortDescription = parent.shortDescription;
+      updates.parentCategoryImage = parent.image;
     }
 
-    if (typeof image === "string") {
-      category.image = image.startsWith("http")
-        ? image
-        : await uploadImage(image);
-    }
+    // Timestamps
+    updates.lastModified = Math.floor(Date.now() / 1000);
+  
 
-    if (identifier !== undefined) category.identifier = identifier;
-    if (name !== undefined) category.name = name;
-    if (shortDescription !== undefined)
-      category.shortDescription = shortDescription;
-    if (status !== undefined) category.status = status;
-    if (displayPriority !== undefined)
-      category.displayPriority = displayPriority;
+    const updated = await Category.updateOne({ recordId }, updates);
 
-    category.lastModified = Date.now();
-    category.modifiedBy = req.user?.email || "system";
-
-    await category.save();
-
-    return successResponse(res, "Category updated successfully", category);
+    return successResponse(res, "Category updated successfully", updated);
   } catch (error) {
     console.error("Edit Category Error:", error);
     return errorResponse(res, "Failed to update category", 500);
   }
 };
+
 
 export const deleteCategory = async (req, res) => {
   try {
@@ -141,7 +150,10 @@ export const deleteCategory = async (req, res) => {
 
     if (!recordId) return errorResponse(res, "recordId is required", 400);
 
-    const deleted = await Category.findOneAndDelete({ recordId });
+    const category = await Category.findOne({ recordId });
+    if (!category) return errorResponse(res, "Category not found", 404);
+    await Category.deleteOne({ recordId });
+    const deleted = category;
     if (!deleted) return errorResponse(res, "Category not found", 404);
 
     return successResponse(res, "Category deleted successfully", deleted);
@@ -157,9 +169,11 @@ export const getAllCategories = async (req, res) => {
     const filter = {};
     if (type) filter.type = type;
 
-    const categories = await Category.find(filter).sort({
-      displayPriority: 1,
-      creationTime: -1,
+    const categories = await Category.find(filter, {
+      sort: {
+        displayPriority: 1,
+        creationTime: -1,
+      },
     });
 
     return successResponse(res, "Categories fetched successfully", categories);
@@ -186,10 +200,15 @@ export const getCategoryByRecordId = async (req, res) => {
 
 export const getCategories = async (req, res) => {
   try {
-    const categories = await Category.find({ parentCategory: null }).sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const categories = await Category.find(
+      { parentCategoryRecordId: null },
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(
       res,
@@ -204,12 +223,17 @@ export const getCategories = async (req, res) => {
 
 export const getSubcategories = async (req, res) => {
   try {
-    const subcategories = await Category.find({
-      parentCategory: { $ne: null },
-    }).sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const subcategories = await Category.find(
+      {
+        parentCategoryRecordId: { $ne: null },
+      },
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(
       res,
@@ -224,10 +248,15 @@ export const getSubcategories = async (req, res) => {
 
 export const Categories = async (req, res) => {
   try {
-    const category = await Category.find().sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const category = await Category.find(
+      {},
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(res, "All Category fetched successfully", category);
   } catch (error) {
@@ -238,10 +267,15 @@ export const Categories = async (req, res) => {
 
 export const getCategory = async (req, res) => {
   try {
-    const category = await Category.find().sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const category = await Category.find(
+      {},
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(res, "All Category fetched successfully", category);
   } catch (error) {
@@ -252,10 +286,15 @@ export const getCategory = async (req, res) => {
 
 export const getAdminCategories = async (req, res) => {
   try {
-    const category = await Category.find().sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const category = await Category.find(
+      {},
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(res, "All Category fetched successfully", category);
   } catch (error) {
@@ -266,12 +305,17 @@ export const getAdminCategories = async (req, res) => {
 
 export const getAdminSubcategories = async (req, res) => {
   try {
-    const subcategories = await Category.find({
-      parentCategory: { $ne: null },
-    }).sort({
-      displayPriority: 1,
-      creationTime: -1,
-    });
+    const subcategories = await Category.find(
+      {
+        parentCategoryRecordId: { $ne: null },
+      },
+      {
+        sort: {
+          displayPriority: 1,
+          creationTime: -1,
+        },
+      }
+    );
 
     return successResponse(
       res,

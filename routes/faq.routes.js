@@ -1,4 +1,4 @@
-import express from "express";
+import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 import {
   addFAQ,
@@ -7,15 +7,15 @@ import {
   getAllFAQs,
   getFAQByRecordId,
 } from "../controller/faq.controller.js";
+import { expressToHono } from "../utils/hono-adapter.js";
 
-const router = express.Router();
-router.use(authMiddleware(["user", "admin"]));
+const router = new Hono();
+router.use("*", authMiddleware(["user", "admin"]));
 
-router.post("/faq/add", addFAQ);
-router.post("/faq/edit", editFAQ);
-router.post("/faq/delete", deleteFAQ);
-router.get("/fqa", getAllFAQs);
-router.post("/faq/getedit", getFAQByRecordId);
-// router.get("/tax/get", getTaxes);
+router.post("/faq/add", expressToHono(addFAQ));
+router.post("/faq/edit", expressToHono(editFAQ));
+router.post("/faq/delete", expressToHono(deleteFAQ));
+router.get("/faq", expressToHono(getAllFAQs));
+router.post("/faq/getedit", expressToHono(getFAQByRecordId));
 
 export default router;
