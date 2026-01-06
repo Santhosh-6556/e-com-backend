@@ -1,4 +1,4 @@
-import Node from "../models/node.controller.js";
+import Node from "../models/node.model.js";
 import { generateRecordId } from "../utils/recordId.js";
 import { errorResponse, successResponse } from "../utils/response.js";
 
