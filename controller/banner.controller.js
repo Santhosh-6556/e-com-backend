@@ -6,25 +6,29 @@ import { generateRecordId } from "../utils/recordId.js";
 import { successResponse, errorResponse } from "../utils/response.js";
 import { uploadImage } from "../utils/uploadImage.js";
 
+/* ---------------- CREATE ---------------- */
 export const createBanner = async (req, res) => {
   try {
     const data = req.body;
 
-    const [image, mobileImage] = await Promise.all([
-      uploadImage(data.image, req.env),
-      data.mobileImage ? uploadImage(data.mobileImage, req.env) : null,
-    ]);
+    const image = data.image
+      ? await uploadImage(data.image, req.env)
+      : null;
 
-    if (data.actionType === "product" && data.targetProduct?.recordId) {
+    const mobileImage = data.mobileImage
+      ? await uploadImage(data.mobileImage, req.env)
+      : null;
+
+    if (data.actionType === "product" && data.targetProductRecordId) {
       const product = await Product.findOne({
-        recordId: data.targetProduct.recordId,
+        recordId: data.targetProductRecordId,
       });
       if (!product) return errorResponse(res, "Target product not found", 400);
     }
 
-    if (data.actionType === "category" && data.targetCategory?.recordId) {
+    if (data.actionType === "category" && data.targetCategoryRecordId) {
       const category = await Category.findOne({
-        recordId: data.targetCategory.recordId,
+        recordId: data.targetCategoryRecordId,
       });
       if (!category)
         return errorResponse(res, "Target category not found", 400);
@@ -35,6 +39,9 @@ export const createBanner = async (req, res) => {
       recordId: generateRecordId(),
       image,
       mobileImage,
+      status: data.status ?? 1,
+      clicks: 0,
+      impressions: 0,
       createdBy: req.user?.email || "system",
     });
 
@@ -45,6 +52,7 @@ export const createBanner = async (req, res) => {
   }
 };
 
+/* ---------------- UPDATE ---------------- */
 export const updateBanner = async (req, res) => {
   try {
     const { recordId, ...updates } = req.body;
@@ -58,42 +66,66 @@ export const updateBanner = async (req, res) => {
       return errorResponse(res, "Banner not found", 404);
     }
 
-    if (updates.image && !updates.image.startsWith("http")) {
-      updates.image = await uploadImage(updates.image, req.env);
+    const updateData = {};
+
+    if (updates.image) {
+      updateData.image = updates.image.startsWith("http")
+        ? updates.image
+        : await uploadImage(updates.image, req.env);
     }
 
-    if (updates.mobileImage && !updates.mobileImage.startsWith("http")) {
-      updates.mobileImage = await uploadImage(updates.mobileImage, req.env);
+    if (updates.mobileImage) {
+      updateData.mobileImage = updates.mobileImage.startsWith("http")
+        ? updates.mobileImage
+        : await uploadImage(updates.mobileImage, req.env);
     }
 
-    if (updates.actionType === "product" && updates.targetProduct?.recordId) {
+    if (updates.actionType === "product" && updates.targetProductRecordId) {
       const product = await Product.findOne({
-        recordId: updates.targetProduct.recordId,
+        recordId: updates.targetProductRecordId,
       });
       if (!product) return errorResponse(res, "Target product not found", 400);
     }
 
-    if (updates.actionType === "category" && updates.targetCategory?.recordId) {
+    if (updates.actionType === "category" && updates.targetCategoryRecordId) {
       const category = await Category.findOne({
-        recordId: updates.targetCategory.recordId,
+        recordId: updates.targetCategoryRecordId,
       });
       if (!category)
         return errorResponse(res, "Target category not found", 400);
     }
 
-    Object.keys(updates).forEach((key) => {
-      if (key !== "recordId") {
-        banner[key] = updates[key];
+    [
+      "identifier",
+      "subtitle",
+      "type",
+      "position",
+      "status",
+      "actionType",
+      "targetProductRecordId",
+      "targetProductSlug",
+      "targetCategoryRecordId",
+      "targetCategoryIdentifier",
+      "customUrl",
+      "startDate",
+      "endDate",
+      "displayPriority",
+      "textColor",
+      "backgroundColor",
+      "buttonText",
+      "buttonColor",
+    ].forEach((field) => {
+      if (field in updates) {
+        updateData[field] = updates[field];
       }
     });
 
+    updateData.modifiedBy = req.user?.email || "system";
+    updateData.lastModified = Math.floor(Date.now() / 1000);
+
     const updatedBanner = await Banner.updateOne(
-      { recordId: bannerId },
-      {
-        ...updates,
-        modifiedBy: req.user?.email || "system",
-        lastModified: Math.floor(Date.now() / 1000),
-      }
+      { recordId },
+      updateData
     );
 
     return successResponse(res, "Banner updated successfully", updatedBanner);
@@ -103,6 +135,7 @@ export const updateBanner = async (req, res) => {
   }
 };
 
+/* ---------------- DELETE ---------------- */
 export const deleteBanner = async (req, res) => {
   try {
     const { recordId } = req.body;
@@ -113,46 +146,57 @@ export const deleteBanner = async (req, res) => {
 
     const banner = await Banner.findOne({ recordId });
     if (!banner) return errorResponse(res, "Banner not found", 404);
-    await Banner.deleteOne({ recordId });
-    const deleted = banner;
-    if (!deleted) return errorResponse(res, "Banner not found", 404);
 
-    return successResponse(res, "Banner deleted successfully", deleted);
+    await Banner.deleteOne({ recordId });
+
+    return successResponse(res, "Banner deleted successfully", banner);
   } catch (error) {
     console.error("DeleteBanner Error:", error);
     return errorResponse(res, "Failed to delete banner", 500);
   }
 };
 
+/* ---------------- GET ACTIVE BANNERS ---------------- */
 export const getBanners = async (req, res) => {
   try {
-    const { type, status, limit = 10 } = req.query;
+    const { type, limit = 10 } = req.query;
 
-    const query = {};
-    if (type) query.type = type;
-    if (status !== undefined) query.status = status === "true";
-
-    query.status = 1;
+    let banners = await Banner.find({ status: 1 });
 
     const now = Math.floor(Date.now() / 1000);
-    query.startDate = { $lte: now };
 
-    const banners = await Banner.find(query, {
-      sort: { displayPriority: 1, position: 1, creationTime: -1 },
-      limit: parseInt(limit),
+    banners = banners.filter(
+      (b) =>
+        (!type || b.type === type) &&
+        (!b.startDate || b.startDate <= now) &&
+        (!b.endDate || b.endDate >= now)
+    );
+
+    banners.sort((a, b) => {
+      if (a.displayPriority !== b.displayPriority) {
+        return a.displayPriority - b.displayPriority;
+      }
+      if (a.position !== b.position) {
+        return a.position - b.position;
+      }
+      return b.creationTime - a.creationTime;
     });
 
-    return successResponse(res, "Banners fetched successfully", banners);
+    return successResponse(
+      res,
+      "Banners fetched successfully",
+      banners.slice(0, Number(limit))
+    );
   } catch (error) {
     console.error("GetBanners Error:", error);
     return errorResponse(res, "Failed to fetch banners", 500);
   }
 };
 
+/* ---------------- GET BY RECORD ID ---------------- */
 export const getBannerByRecordId = async (req, res) => {
   try {
     const { recordId } = req.body;
-
     if (!recordId) return errorResponse(res, "recordId is required", 400);
 
     const banner = await Banner.findOne({ recordId });
@@ -165,15 +209,15 @@ export const getBannerByRecordId = async (req, res) => {
   }
 };
 
+/* ---------------- CLICK TRACKING ---------------- */
 export const recordBannerClick = async (req, res) => {
   try {
     const { recordId } = req.body;
-
     if (!recordId) return errorResponse(res, "recordId is required", 400);
 
     const banner = await Banner.findOne({ recordId });
     if (!banner) return errorResponse(res, "Banner not found", 404);
-    
+
     const updatedBanner = await Banner.updateOne(
       { recordId },
       { clicks: (banner.clicks || 0) + 1 }
@@ -186,31 +230,15 @@ export const recordBannerClick = async (req, res) => {
   }
 };
 
+/* ---------------- ADMIN: ALL BANNERS ---------------- */
 export const getAllBanners = async (req, res) => {
   try {
-    const { includeExpired = "false", includeInactive = "false" } = req.query;
+    const banners = await Banner.find();
 
-    const query = {};
-
-    if (includeInactive === "false") {
-      query.status = 1;
-    }
-
-    if (includeExpired === "false") {
-      const now = Math.floor(Date.now() / 1000);
-      query.$or = [
-        { endDate: null },
-        { endDate: { $gte: now } },
-      ];
-      query.startDate = { $lte: now };
-    }
-
-    const banners = await Banner.find(query, {
-      sort: {
-        type: 1,
-        position: 1,
-        creationTime: -1,
-      },
+    banners.sort((a, b) => {
+      if (a.type !== b.type) return a.type.localeCompare(b.type);
+      if (a.position !== b.position) return a.position - b.position;
+      return b.creationTime - a.creationTime;
     });
 
     return successResponse(res, "All banners fetched successfully", banners);
