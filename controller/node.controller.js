@@ -70,31 +70,47 @@ export const getNodeMenuData = async (req, res) => {
     const { identifier } = req.query;
     const filter = identifier ? { identifier } : {};
 
-    const nodes = await Node.find(filter, {
-      sort: { displayPriority: 1, creationTime: -1 },
+    // 1️⃣ Fetch array
+    let nodes = await Node.find(filter);
+
+    // 2️⃣ Sort manually
+    nodes = nodes.sort((a, b) => {
+      if (a.displayPriority !== b.displayPriority) {
+        return a.displayPriority - b.displayPriority;
+      }
+      return b.creationTime - a.creationTime;
     });
 
-    return successResponse(res, "Nodes fetched successfully", nodes);
+    // 3️⃣ Select required fields
+    const formattedNodes = nodes.map((node) => ({
+      path: node.path,
+      parentNode: node.parentNode,
+      displayPriority: node.displayPriority,
+      identifier: node.identifier,
+      shortDescription: node.shortDescription,
+      status: node.status,
+    }));
+
+    return successResponse(res, "Nodes fetched successfully", formattedNodes);
   } catch (error) {
     console.error(error);
     return errorResponse(res, "Failed to fetch nodes", 500);
   }
 };
 
+
 export const getParentNodes = async (req, res) => {
   try {
     const { identifier } = req.query;
 
-    const filter = { parentNodeRecordId: null };
+    const filter = { parentNode: null };
     if (identifier) {
       filter.identifier = identifier;
     }
 
-    const nodes = await Node.find(filter, {
-      sort: {
-        displayPriority: 1,
-        creationTime: -1,
-      },
+    const nodes = await Node.find(filter).sort({
+      displayPriority: 1,
+      creationTime: -1,
     });
 
     const formattedNodes = nodes.map((node) => ({
@@ -134,38 +150,34 @@ export const editNode = async (req, res) => {
       displayPriority,
       shortDescription,
       identifier,
-      name,
-      status
     } = req.body;
 
-    // Require recordId
+    // Require recordId instead of identifier
     if (!recordId) {
       return errorResponse(res, "recordId is required to edit node", 400);
     }
 
-    // Find node
+    // Find node by recordId
     const node = await Node.findOne({ recordId });
     if (!node) {
       return errorResponse(res, "Node not found", 404);
     }
 
-    // Update basic fields
+    // Update fields
     node.path = path ?? node.path;
     node.identifier = identifier ?? node.identifier;
     node.displayPriority = displayPriority ?? node.displayPriority;
     node.shortDescription = shortDescription ?? node.shortDescription;
-    node.name = name ?? node.name;
-    node.status = status ?? node.status;
 
     // Handle parentNode properly
     if (parentNode === null) {
-      node.parentNode = null;
+      node.parentNode = null; // clear existing parent
     } else if (parentNode?.recordId) {
+      // re-fetch parent from DB
       const parent = await Node.findOne({ recordId: parentNode.recordId });
       if (!parent) {
         return errorResponse(res, "Parent node not found", 404);
       }
-
       node.parentNode = {
         path: parent.path,
         name: parent.name,
@@ -174,15 +186,15 @@ export const editNode = async (req, res) => {
         identifier: parent.identifier,
       };
     }
+    // if parentNode is undefined → leave as is
 
-    // Update audit fields
-    node.modifiedBy = req.user?.email || "unknown";
-    node.lastModified = Math.floor(Date.now() / 1000);
-
-    // Save changes
     const updatedNode = await Node.updateOne(
-      { recordId },
-      node
+      { recordId: nodeId },
+      {
+        ...updates,
+        modifiedBy: req.user?.email || "unknown",
+        lastModified: Math.floor(Date.now() / 1000),
+      }
     );
 
     return successResponse(res, "Node updated successfully", updatedNode);
@@ -191,7 +203,6 @@ export const editNode = async (req, res) => {
     return errorResponse(res, "Failed to update node", 500);
   }
 };
-
 
 export const deleteNode = async (req, res) => {
   try {
@@ -226,7 +237,9 @@ export const getNodeByRecordId = async (req, res) => {
     }
 
     // Find the node by recordId
-    const node = await Node.findOne({ recordId });
+    const node = await Node.findOne({ recordId }).select(
+      "recordId path parentNode displayPriority identifier shortDescription status createdBy modifiedBy creationTime lastModified"
+    );
 
     if (!node) {
       return errorResponse(res, "Node not found", 404);
@@ -241,15 +254,10 @@ export const getNodeByRecordId = async (req, res) => {
 
 export const getAllNodes = async (req, res) => {
   try {
-    const nodes = await Node.find(
-      {},
-      {
-        sort: {
-          displayPriority: 1,
-          creationTime: -1,
-        },
-      }
-    );
+    const nodes = await Node.find().sort({
+      displayPriority: 1,
+      creationTime: -1,
+    });
 
     return successResponse(res, "All nodes fetched successfully", nodes);
   } catch (error) {

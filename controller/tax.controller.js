@@ -75,12 +75,16 @@ export const deleteTax = async (req, res) => {
   }
 };
 
+// ✅ Get All Taxes (Sorted by creationTime DESC)
 export const getAllTaxes = async (req, res) => {
   try {
-    const taxes = await Tax.find({}, { sort: { creationTime: -1 } });
-    return successResponse(res, "Taxes fetched successfully", taxes);
+    // Run a D1-safe SQL query
+    const taxes = await Tax.query("SELECT * FROM taxes ORDER BY creationTime DESC;");
+
+    // D1 returns { results: [...], meta: {...} }
+    return successResponse(res, "Taxes fetched successfully", taxes.results || []);
   } catch (error) {
-    console.error("Get All Taxes Error:", error);
+    console.error("Get All Taxes Error:", error?.message || error);
     return errorResponse(res, "Failed to fetch taxes", 500);
   }
 };
