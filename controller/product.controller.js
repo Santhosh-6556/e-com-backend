@@ -43,6 +43,7 @@ export const addProduct = async (req, res) => {
 export const editProduct = async (req, res) => {
   try {
     const { recordId, ...updates } = req.body;
+
     if (!recordId) {
       return errorResponse(res, "recordId is required", 400);
     }
@@ -52,103 +53,80 @@ export const editProduct = async (req, res) => {
       return errorResponse(res, "Product not found", 404);
     }
 
+    const updateData = {};
+
+    // ---------- Relations ----------
     if ("brand" in updates) {
       if (updates.brand === null) {
-        product.brand = null;
-      } else if (updates.brand?.recordId) {
+        updateData.brandRecordId = null;
+        updateData.brandIdentifier = null;
+      } else {
         const brand = await Brand.findOne({ recordId: updates.brand.recordId });
         if (!brand) return errorResponse(res, "Invalid brand recordId", 400);
-        product.brand = {
-          recordId: brand.recordId,
-          identifier: brand.identifier,
-        };
+        updateData.brandRecordId = brand.recordId;
+        updateData.brandIdentifier = brand.identifier;
       }
     }
+
     if ("tax" in updates) {
       if (updates.tax === null) {
-        product.tax = null;
-      } else if (updates.tax?.recordId) {
+        updateData.taxRecordId = null;
+        updateData.taxIdentifier = null;
+      } else {
         const tax = await Tax.findOne({ recordId: updates.tax.recordId });
         if (!tax) return errorResponse(res, "Invalid tax recordId", 400);
-        product.tax = { recordId: tax.recordId, identifier: tax.identifier };
+        updateData.taxRecordId = tax.recordId;
+        updateData.taxIdentifier = tax.identifier;
       }
     }
 
     if ("subcategory" in updates) {
       if (updates.subcategory === null) {
-        product.subcategory = null;
-      } else if (updates.subcategory?.recordId) {
+        updateData.subcategoryRecordId = null;
+        updateData.subcategoryIdentifier = null;
+      } else {
         const subCat = await Category.findOne({
           recordId: updates.subcategory.recordId,
         });
         if (!subCat)
           return errorResponse(res, "Invalid subcategory recordId", 400);
-        product.subcategory = {
-          recordId: subCat.recordId,
-          identifier: subCat.identifier,
-        };
+        updateData.subcategoryRecordId = subCat.recordId;
+        updateData.subcategoryIdentifier = subCat.identifier;
       }
     }
 
     if ("category" in updates) {
-      if (updates.category === null) {
-        product.category = null;
-      } else if (updates.category?.recordId) {
-        const category = await Category.findOne({
-          recordId: updates.category.recordId,
-        });
-        if (!category)
-          return errorResponse(res, "Invalid category recordId", 400);
-        product.category = {
-          recordId: category.recordId,
-          identifier: category.identifier,
-        };
-      }
+      const category = await Category.findOne({
+        recordId: updates.category.recordId,
+      });
+      if (!category)
+        return errorResponse(res, "Invalid category recordId", 400);
+      updateData.categoryRecordId = category.recordId;
+      updateData.categoryIdentifier = category.identifier;
     }
 
-    if ("ratings" in updates) {
-      product.ratings = updates.ratings ?? { average: 0, count: 0 };
-    }
-
-    if ("reviews" in updates) {
-      product.reviews = Array.isArray(updates.reviews) ? updates.reviews : [];
-    }
-
+    // ---------- Images ----------
     if ("images" in updates) {
-      product.images = await Promise.all(
-        (updates.images || []).map(async (img) =>
-          img.startsWith("http") ? img : await uploadImage(img, req.env)
+      updateData.images = JSON.stringify(
+        await Promise.all(
+          (updates.images || []).map((img) =>
+            img.startsWith("http") ? img : uploadImage(img, req.env)
+          )
         )
       );
     }
 
     if ("carouselImages" in updates) {
-      product.carouselImages = await Promise.all(
-        (updates.carouselImages || []).map(async (img) =>
-          img.startsWith("http") ? img : await uploadImage(img, req.env)
+      updateData.carouselImages = JSON.stringify(
+        await Promise.all(
+          (updates.carouselImages || []).map((img) =>
+            img.startsWith("http") ? img : uploadImage(img, req.env)
+          )
         )
       );
     }
 
-    if ("productDescription" in updates) {
-      product.productDescription = await Promise.all(
-        (updates.productDescription || []).map(async (desc) => ({
-          text: desc.text,
-          image: desc.image
-            ? desc.image.startsWith("http")
-              ? desc.image
-              : await uploadImage(desc.image, req.env)
-            : null,
-        }))
-      );
-    }
-
-    ["highlights", "attributes", "Features"].forEach((field) => {
-      if (field in updates) {
-        product[field] = updates[field] || [];
-      }
-    });
-
+    // ---------- Text fields ----------
     [
       "name",
       "price",
@@ -159,29 +137,37 @@ export const editProduct = async (req, res) => {
       "identifier",
       "slug",
       "isTrending",
+      "highlights",
+      "attributes",
+      "features",
     ].forEach((field) => {
       if (field in updates) {
-        product[field] = updates[field];
+        updateData[field] =
+          typeof updates[field] === "object"
+            ? JSON.stringify(updates[field])
+            : updates[field];
       }
     });
 
-    const updateData = {
-      ...updates,
-      modifiedBy: req.user?.email || "system",
-      lastModified: Math.floor(Date.now() / 1000),
-    };
+    updateData.modifiedBy = req.user?.email || "system";
+    updateData.lastModified = Math.floor(Date.now() / 1000);
 
     const updatedProduct = await Product.updateOne(
-      { recordId: productId },
+      { recordId },
       updateData
     );
 
-    return successResponse(res, "Product updated successfully", updatedProduct);
+    return successResponse(
+      res,
+      "Product updated successfully",
+      updatedProduct
+    );
   } catch (error) {
     console.error("EditProduct Error:", error);
     return errorResponse(res, "Failed to update product", 500);
   }
 };
+
 
 export const deleteProduct = async (req, res) => {
   try {
