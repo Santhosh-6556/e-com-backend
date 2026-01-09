@@ -161,39 +161,41 @@ export const getBanners = async (req, res) => {
   try {
     const { type, limit = 10 } = req.query;
 
-    // 🔴 IMPORTANT: no filter inside find()
     let banners = await Banner.find();
 
-    if (!Array.isArray(banners)) {
-      banners = [];
-    }
+    if (!Array.isArray(banners)) banners = [];
 
-    const now = Math.floor(Date.now() / 1000);
+    const now = Date.now(); // milliseconds
 
     banners = banners.filter((b) => {
-      // status check (INTEGER 0/1)
-      if (b.status !== 1) return false;
+      // ✅ status is BOOLEAN
+      if (b.status !== true) return false;
 
       // type filter
       if (type && b.type !== type) return false;
 
-      // date window
-      if (b.startDate && b.startDate > now) return false;
-      if (b.endDate && b.endDate < now) return false;
+      // ✅ startDate is Date
+      if (b.startDate && b.startDate.getTime() > now) return false;
+
+      // ✅ endDate is Date
+      if (b.endDate && b.endDate.getTime() < now) return false;
 
       return true;
     });
 
     banners.sort((a, b) => {
-      if ((a.displayPriority ?? 0) !== (b.displayPriority ?? 0)) {
-        return (a.displayPriority ?? 0) - (b.displayPriority ?? 0);
+      if ((a.displayPriority ?? 1) !== (b.displayPriority ?? 1)) {
+        return (a.displayPriority ?? 1) - (b.displayPriority ?? 1);
       }
 
       if ((a.position ?? 0) !== (b.position ?? 0)) {
         return (a.position ?? 0) - (b.position ?? 0);
       }
 
-      return (b.creationTime ?? 0) - (a.creationTime ?? 0);
+      return (
+        (b.creationTime?.getTime?.() || 0) -
+        (a.creationTime?.getTime?.() || 0)
+      );
     });
 
     return successResponse(
@@ -206,6 +208,7 @@ export const getBanners = async (req, res) => {
     return errorResponse(res, "Failed to fetch banners", 500);
   }
 };
+
 
 
 /* ---------------- GET BY RECORD ID ---------------- */
