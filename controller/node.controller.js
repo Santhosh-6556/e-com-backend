@@ -234,21 +234,42 @@ export const getNodeByRecordId = async (req, res) => {
       return errorResponse(res, "recordId is required", 400);
     }
 
-    // Find the node by recordId
-    const node = await Node.findOne({ recordId }).select(
-      "recordId path parentNode displayPriority identifier shortDescription status createdBy modifiedBy creationTime lastModified"
-    );
+    const node = await Node.findOne({ recordId });
 
     if (!node) {
       return errorResponse(res, "Node not found", 404);
     }
 
-    return successResponse(res, "Node fetched successfully", node);
+    // Manually shape response (D1-safe)
+    const formattedNode = {
+      recordId: node.recordId,
+      path: node.path,
+      parentNode: node.parentNode,
+      displayPriority: node.displayPriority,
+      identifier: node.identifier,
+      shortDescription: node.shortDescription,
+      status: node.status,
+      creator: node.creator,
+      modifiedBy: node.modifiedBy,
+      creationTime: node.creationTime
+        ? node.creationTime.getTime()
+        : null,
+      lastModified: node.lastModified
+        ? node.lastModified.getTime()
+        : null,
+    };
+
+    return successResponse(
+      res,
+      "Node fetched successfully",
+      formattedNode
+    );
   } catch (error) {
-    console.error(error);
+    console.error("GetNodeByRecordId Error:", error);
     return errorResponse(res, "Failed to fetch node", 500);
   }
 };
+
 
 export const getAllNodes = async (req, res) => {
   try {
