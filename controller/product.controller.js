@@ -40,90 +40,57 @@ export const addProduct = async (req, res) => {
   }
 };
 
-export const editProduct = async (req, res) => {
+export const editProduct = async (c) => {
   try {
-    const { recordId } = req.body;
+    const body = await c.req.json();
+    const { recordId, name, price, image } = body;
 
     if (!recordId) {
-      return errorResponse(res, "recordId is required", 400);
+      return errorResponse(c, "recordId is required", 400);
     }
 
-    const existingProduct = await Product.findOne({ recordId });
-    if (!existingProduct) {
-      return errorResponse(res, "Product not found", 404);
+    let imageUrl = null;
+    if (image) {
+      imageUrl = await uploadImage(image, c.env);
     }
 
-    const updateData = { ...req.body };
+    await c.env.DB.prepare(
+      `
+      UPDATE products
+      SET name = COALESCE(?, name),
+          price = COALESCE(?, price),
+          image = COALESCE(?, image)
+      WHERE recordId = ?
+    `
+    )
+      .bind(name, price, imageUrl, recordId)
+      .run();
 
-    // 🔹 Handle image upload (if new image sent)
-    if (req.file) {
-      const imageUrl = await uploadImage(req.file);
-      updateData.image = imageUrl;
+    return successResponse(c, "Product updated successfully");
+  } catch (err) {
+    console.error(err);
+    return errorResponse(c, "Failed to update product", 500);
+  }
+};
+
+export const deleteProduct = async (c) => {
+  try {
+    const { recordId } = await c.req.json();
+
+    if (!recordId) {
+      return errorResponse(c, "recordId is required", 400);
     }
 
-    // 🔹 Update category
-    if (updateData.category?.recordId) {
-      const category = await Category.findOne({
-        recordId: updateData.category.recordId,
-      });
-      if (!category) {
-        return errorResponse(res, "Category not found", 404);
-      }
-      updateData.categoryRecordId = category.recordId;
-      updateData.categoryName = category.name;
-    }
+    await c.env.DB.prepare(
+      "DELETE FROM products WHERE recordId = ?"
+    )
+      .bind(recordId)
+      .run();
 
-    // 🔹 Update subcategory
-    if (updateData.subcategory?.recordId) {
-      updateData.subcategoryRecordId = updateData.subcategory.recordId;
-    }
-
-    // 🔹 Update brand
-    if (updateData.brand?.recordId) {
-      const brand = await Brand.findOne({
-        recordId: updateData.brand.recordId,
-      });
-      if (!brand) {
-        return errorResponse(res, "Brand not found", 404);
-      }
-      updateData.brandRecordId = brand.recordId;
-      updateData.brandName = brand.name;
-    }
-
-    // 🔹 Update tax
-    if (updateData.tax?.recordId) {
-      const tax = await Tax.findOne({
-        recordId: updateData.tax.recordId,
-      });
-      if (!tax) {
-        return errorResponse(res, "Tax not found", 404);
-      }
-      updateData.taxRecordId = tax.recordId;
-      updateData.taxPercentage = tax.percentage;
-    }
-
-    // 🔹 Update slug if product name changed
-    if (updateData.name) {
-      updateData.slug = updateData.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)+/g, "");
-    }
-
-    const updatedProduct = await Product.findOneAndUpdate(
-      { recordId },
-      { $set: updateData },
-      { new: true }
-    );
-
-    return successResponse(
-      res,
-      "Product updated successfully",
-      updatedProduct
-    );
-  } catch (error) {
-    console.error("EditProduct Error:", error);
-    return errorResponse(res, "Failed to update product", 500);
+    return successResponse(c, "Product deleted successfully");
+  } catch (err) {
+    console.error(err);
+    return errorResponse(c, "Failed to delete product", 500);
   }
 };
 
@@ -293,4 +260,5 @@ export const getTrendingProducts = async (req, res) => {
     return errorResponse(res, "Failed to fetch treanding products");
   }
 };
+
 
