@@ -161,25 +161,39 @@ export const getBanners = async (req, res) => {
   try {
     const { type, limit = 10 } = req.query;
 
-    let banners = await Banner.find({ status: 1 });
+    // 🔴 IMPORTANT: no filter inside find()
+    let banners = await Banner.find();
+
+    if (!Array.isArray(banners)) {
+      banners = [];
+    }
 
     const now = Math.floor(Date.now() / 1000);
 
-    banners = banners.filter(
-      (b) =>
-        (!type || b.type === type) &&
-        (!b.startDate || b.startDate <= now) &&
-        (!b.endDate || b.endDate >= now)
-    );
+    banners = banners.filter((b) => {
+      // status check (INTEGER 0/1)
+      if (b.status !== 1) return false;
+
+      // type filter
+      if (type && b.type !== type) return false;
+
+      // date window
+      if (b.startDate && b.startDate > now) return false;
+      if (b.endDate && b.endDate < now) return false;
+
+      return true;
+    });
 
     banners.sort((a, b) => {
-      if (a.displayPriority !== b.displayPriority) {
-        return a.displayPriority - b.displayPriority;
+      if ((a.displayPriority ?? 0) !== (b.displayPriority ?? 0)) {
+        return (a.displayPriority ?? 0) - (b.displayPriority ?? 0);
       }
-      if (a.position !== b.position) {
-        return a.position - b.position;
+
+      if ((a.position ?? 0) !== (b.position ?? 0)) {
+        return (a.position ?? 0) - (b.position ?? 0);
       }
-      return b.creationTime - a.creationTime;
+
+      return (b.creationTime ?? 0) - (a.creationTime ?? 0);
     });
 
     return successResponse(
@@ -192,6 +206,7 @@ export const getBanners = async (req, res) => {
     return errorResponse(res, "Failed to fetch banners", 500);
   }
 };
+
 
 /* ---------------- GET BY RECORD ID ---------------- */
 export const getBannerByRecordId = async (req, res) => {
